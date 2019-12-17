@@ -191,6 +191,9 @@ def Stress_Strain_Master_Int(Input_Type, E_Mods, Viscs, Input_Function, Int_Type
         # lambdify uses numpy and scipy functions. If integ.quad fails, try just scipy ones.
         Lambdified_To_Int = sp.lambdify([x, t], To_Integrate)#, modules='scipy')
         Numerical_Term_Func = lambda t: integ.quad(Lambdified_To_Int, 0, t, args=(t))
+        #Alternative numerical integration methods. Neither seem to work anyway, though I haven't properly investigated.
+        #Numerical_Term_Func = lambda t: integ.fixed_quad(Lambdified_To_Int, 0, t, args=(t), n=5)
+        #Numerical_Term_Func = lambda t: integ.romberg(Lambdified_To_Int, 0, t, args=(t)) #This one doesn't return a tuple, just a value.
         Analytical_Term = First_Term
         return Analytical_Term, Numerical_Term_Func
     else:
