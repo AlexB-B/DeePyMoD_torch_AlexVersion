@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import sympy as sp
@@ -232,3 +233,18 @@ def Eval_Array_From_Expr_w_NumInt(Input_Value_Array, Symbol_Variable, Tuple_of_E
         Result_Array = np.append(Result_Array, Ana_Value+Num_Value)
     
     return Result_Array
+
+
+def save_stress_strain(time, Strain_Array, Stress_Array, Folder_Path, Input_Type, Input_Description, E_Mods, Viscs):
+    
+    time = time.reshape(-1, 1)
+    Strain_Array = Strain_Array.reshape(-1, 1)
+    Stress_Array = Stress_Array.reshape(-1, 1)
+    
+    Data_Export = np.concatenate((time, Strain_Array, Stress_Array), axis=1)
+    
+    if not os.path.isdir(Folder_Path):
+        os.makedirs(Folder_Path)
+    
+    Filename = Input_Type + ' ' + Input_Description + ' E' + str(E_Mods) + ' V' + str(Viscs)
+    np.savetxt(Folder_Path+'/'+Filename+'.csv', Data_Export, delimiter=',')
