@@ -91,7 +91,8 @@ def mech_library(data, prediction, library_config):
     else:
         Strain = du_2
         Stress = du_1
-        
+    
+    #need to think about exceptions here. Is the first derivative of strain always present? What if there is no 2nd derivative and hence no 3rd column in 'Strain, causing the second line below to call an index which doesn't exist?
     Strain_t = Strain[:, 1] # Extract the first time derivative of strain
     Strain = torch.cat((Strain[:, 0], Strain[:, 2:]), dim=1) # remove this before it gets put into theta #potentially a neater way to do this.
     Strain *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
