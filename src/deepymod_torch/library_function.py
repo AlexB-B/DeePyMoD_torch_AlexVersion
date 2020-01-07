@@ -3,6 +3,11 @@ import torch
 from torch.autograd import grad
 from itertools import combinations, product
 from functools import reduce
+import sys
+import sympy as sym
+
+sys.path.append('../../')
+import data.Generation.VE_DataGen_Functions as vedg
 
 def library_poly(prediction, library_config):
     '''
@@ -31,59 +36,64 @@ def library_poly(prediction, library_config):
     return u
 
 
-def mech_library(data, prediction, Input_Expression, library_config):
+def mech_library(data, prediction, Input_Expression, library_config, Input_Type='Strain'):
+    # Not sure if having 2 additional arguements will cause an issue for the deepmod implementation. Might need to build these into the library_config dictionary instead
+    
     '''
     Constructs a library graph in 1D. Library config is dictionary with required terms.
     
     data in this case is strictly the time data
     prediction can be either stress or strain, but must be the data calculated as a result of the feedfoward run of the NN.
-    Input_Expression is the analytical functional form of the stress or the strain, whichever is input. It must be differentiatable. Initially i am imagining this as a SymPy expression but perhaps it is possible to have it as a lambda function.
+    Input_Expression is the analytical functional form of the stress or the strain, whichever is input. It must be differentiatable. This is a SymPy expression to allow for analytical differentiation.
     library_config should be a dictionary stating the max order of differential and need specify nothing more
+    Input_Type should be either stress or strain and will determine primarily which data are placed into Strain_t (derived from input expression or prediction) and which data is placed in the first columns of theta.
     
     '''
     
-    max_order = library_config['diff_order']
+    max_order = library_config['diff_order']    
+    t = sym.symbols('t', real=True)
     
+    #Begin by computing the values of the terms corresponding to teh input, for which an anlytical expression is given. du_1 always corresponds to this
+    du_1 = torch.tensor([])
+    #I am converting into numpy as I assume sympy cannot handle torch. I could try using tensors directly to simplify the code a little.
+    Data_Array = np.array(data) #Alternative is 'Data_array = data.numpy()' but this causes a shared memory location. Using np.array copies the data into a new memory location.
     
-    #This should not have sigma hardcoded as it could be epslion. If we want a type-ambivalent name, could just call it x.
-    #If Input_Expression is a sympy thing, can it take torch tensors? Better to convert to Numpy and back?
-    x = Input_Expression(data) #this won't work, its just a stand in for the idea of using the sympu expression to return a numpy array....
-    # yh, that may need to be converted back into a tensor
-    Exp_t = Input_Expression.diff(t) #here i am using a way of doinf differentiation in sympy
-    x_t = Exp_t(data)
-    Exp_tt = Exp_t.diff(t)
-    x_tt = Exp_tt(data)
-    '''
-    ...
-    or
-    '''
+    Expression = Input_Expression
+    for order in range(max_order):
+        if order > 0:
+            Expression = Expression.diff(t)
+        
+        x = vedg.Eval_Array_From_Expression(Data_Array, t, Expression)
+        x = torch.tensor(x)
+        du_1 = torch.cat((du_1, x), dim=1)
     
-    sigma_t = (data*torch.cos(data) - torch.sin(data))/(data**2)
-    sigma_tt = -((data**2-2)*torch.sin(data)+2*data*torch.cos(data))/(data**3)
-    sigma_ttt = (3*(data**2-2)*torch.sin(data)-data*(data**2-6)*torch.cos(data))/(data**4)
-    sigma_tttt = (4*(data**2-6)*torch.cos(data)+(data**4-12*data**2+24)*torch.sin(data))/(data**5)
-    
-        du_2 = prediction.clone().detach()
-    for order in np.arange(1, max_order):
-        du_2 = torch.cat((du_2, grad(du_2[:, order:order+1], data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0][:, 1:2]), dim=1)
+    #Next use the result of the feedforward pass of the NN to calculate derivatives of your prediction with respect to time. This always corresponds to du_2
+    du_2 = prediction.clone().detach()
+    for order in range(max_order):
+        y = grad(du_2[:, order], data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0] #removed this '[:, 1:2]' from very end of grad()[] statement # removed ':order+1' from slicing of du_2.
+        du_2 = torch.cat((du_2, y), dim=1)
     #Not sure where the grad_output comes in
-    #y signifies output whatever that may be
-    dy = grad(prediction, data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0]
-    y_t = dy[:, 0:1]
-    dyy = grad(y_t, data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0]
-    y_tt = dyy[:, 0:1]
-    dyyy = grad(y_tt, data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0]
-    y_ttt = dyyy[:, 0:1]
     
-    #Set up an if statement here that asks which of x and y is strain and then ensures that this is the former series of values in the final 'du'. It does not have to be this way around, but it makes more sense to me.
+    if not (Input_Type == 'Strain' or Input_Type == 'Stress'):
+        print('Improper description of input choice. Defaulting to \'Strain\'')
+        Input_Type = 'Strain'
     
-    # Will therefore concatenate more like du = torch.cat((du_1, du_2), dim=1) assuming strain was teh input parmeter.
-    # will also need to make sure in code above that the strain derivative in time (1st order is not part of this. As a resuklt, will need to understand teh nature of x and y a little earlier than just here
+    if Input_Type == 'Strain':
+        Strain = du_1
+        Stress = du_2
+    else:
+        Strain = du_2
+        Stress = du_1
+        
+    Strain_t = Strain[:, 1] # Extract the first time derivative of strain
+    Strain = torch.cat((Strain[:, 0], Strain[:, 2:]), dim=1) # remove this before it gets put into theta
+    Strain *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
+    theta = torch.cat((Strain, Stress), dim=1) # I have arbitrarily set the convention of making Strain the first columns of data
     
-    du = torch.cat((sigma, sigma_t, sigma_tt,sigma_ttt, -prediction, -y_tt,-y_ttt), dim=1)
-    samples= du.shape[0]
-    theta = du.view(samples,-1)# I'm not convinced this line is not redundant and couldn't just have theta = du (maybe du.clone() or du[:,:] or something to avoid pointer issues)
-    return [y_t], theta
+    #samples= du.shape[0]
+    #theta = du.view(samples,-1)# I'm not convinced this line is not redundant and couldn't just have theta = du (maybe du.clone() or du[:,:] or something to avoid pointer issues)
+    
+    return Strain_t, theta
 
 def mech_library_group(data, prediction, library_config):
     '''
