@@ -53,7 +53,7 @@ def deepmod_init(network_config, library_config):
     
     coeff_vector_list = [torch.randn((total_terms, 1), dtype=torch.float32, requires_grad=True) for _ in torch.arange(output_dim)]
     if library_config.get('coeff_sign', None) == 'positive':
-        coeff_vector_list = [abs(value) for value in coeff_vector_list]
+        coeff_vector_list = [abs(tensor_for_output).detach() for tensor_for_output in coeff_vector_list]
         
     sparsity_mask_list = [torch.arange(total_terms) for _ in torch.arange(output_dim)]
 
