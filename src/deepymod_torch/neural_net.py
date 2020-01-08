@@ -50,8 +50,11 @@ def deepmod_init(network_config, library_config):
     sample_prediction = torch_network(sample_data)
     _, theta = library_function(sample_data, sample_prediction, library_config)
     total_terms = theta.shape[1]
-
+    
     coeff_vector_list = [torch.randn((total_terms, 1), dtype=torch.float32, requires_grad=True) for _ in torch.arange(output_dim)]
+    if library_config.get('coeff_sign', None) == 'positive':
+        coeff_vector_list = [abs(value) for value in coeff_vector_list]
+        
     sparsity_mask_list = [torch.arange(total_terms) for _ in torch.arange(output_dim)]
 
     return torch_network, coeff_vector_list, sparsity_mask_list
