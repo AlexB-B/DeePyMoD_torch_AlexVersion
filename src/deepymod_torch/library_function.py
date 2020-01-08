@@ -57,7 +57,7 @@ def mech_library(data, prediction, library_config):
         du_1 = library_config['theta_from_input']
     else:
         t = sym.symbols('t', real=True)
-        Data_Array = np.array(data) #Alternative is 'Data_array = data.numpy()' but this causes a shared memory location. Using np.array copies the data into a new memory location.
+        Data_Array = np.array(data.detach()) #Alternative is 'Data_array = data.detach().numpy()' but this causes a shared memory location. Using np.array copies the data into a new memory location.
         #I am converting into numpy as I assume sympy cannot handle torch. I could try using tensors directly to simplify the code a little. #It shouldn't be an issue to drop out of tensor data types as these results are analytically derived from the timepoints, and do not depend on the NN.  
         
         du_1 = torch.tensor([])
@@ -74,9 +74,9 @@ def mech_library(data, prediction, library_config):
     
     
     #Next use the result of the feedforward pass of the NN to calculate derivatives of your prediction with respect to time. This always corresponds to du_2
-    du_2 = prediction.clone().detach()
+    du_2 = prediction #.clone()
     for order in range(max_order):
-        y = grad(du_2[:, order], data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0] #removed this '[:, 1:2]' from very end of grad()[] statement # removed ':order+1' from slicing of du_2.
+        y = grad(du_2[:, [order]], data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0] #removed this '[:, 1:2]' from very end of grad()[] statement # removed ':order+1' from slicing of du_2.
         du_2 = torch.cat((du_2, y), dim=1)
     #Not sure where the grad_output comes in
     
@@ -92,9 +92,8 @@ def mech_library(data, prediction, library_config):
         Strain = du_2
         Stress = du_1
     
-    #need to think about exceptions here. Is the first derivative of strain always present? What if there is no 2nd derivative and hence no 3rd column in 'Strain, causing the second line below to call an index which doesn't exist?
     Strain_t = Strain[:, 1] # Extract the first time derivative of strain
-    Strain = torch.cat((Strain[:, 0], Strain[:, 2:]), dim=1) # remove this before it gets put into theta #potentially a neater way to do this.
+    Strain = torch.cat((Strain[:, [0]], Strain[:, 2:]), dim=1) # remove this before it gets put into theta #potentially a neater way to do this.
     Strain *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
     theta = torch.cat((Strain, Stress), dim=1) # I have arbitrarily set the convention of making Strain the first columns of data
     
