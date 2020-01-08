@@ -95,7 +95,8 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     max_iterations = optim_config['max_iterations']
     l1 = optim_config['lambda']
     library_function = library_config['type']
-
+    
+    #only idea after much thougfht is to try taking coeff_vector out of list structure for following statement, but this is not of my design, why would it work for Remy and Jan but not me???
     optimizer = torch.optim.Adam([{'params': network.parameters(), 'lr': 0.002}, {'params': coeff_vector_list, 'lr': 0.002}])
 
     # preparing tensorboard writer
@@ -112,15 +113,15 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
 
         # Scaling
         coeff_vector_scaled_list = [scaling(coeff_vector, sparse_theta, time_deriv) for time_deriv, sparse_theta, coeff_vector in zip(time_deriv_list, sparse_theta_list, coeff_vector_list)]
-
+        
         # Calculating PI
         reg_cost_list = torch.stack([torch.mean((time_deriv - sparse_theta @ coeff_vector)**2) for time_deriv, sparse_theta, coeff_vector in zip(time_deriv_list, sparse_theta_list, coeff_vector_list)])
         loss_reg = torch.sum(reg_cost_list)
-
+        
         # Calculating MSE
         MSE_cost_list = torch.mean((prediction - target)**2, dim=0)
         loss_MSE = torch.sum(MSE_cost_list)
-
+        
         # Calculating L1
         l1_cost_list = torch.stack([torch.sum(torch.abs(coeff_vector_scaled)) for coeff_vector_scaled in coeff_vector_scaled_list])
         loss_l1 = l1 * torch.sum(l1_cost_list)
