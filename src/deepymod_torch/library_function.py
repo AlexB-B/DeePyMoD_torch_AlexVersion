@@ -57,16 +57,13 @@ def mech_library(data, prediction, library_config):
         du_1 = library_config['theta_from_input']
     else:
         t = sym.symbols('t', real=True)
-        Data_Array = np.array(data.detach()) #Alternative is 'Data_array = data.detach().numpy()' but this causes a shared memory location. Using np.array copies the data into a new memory location.
-        #I am converting into numpy as I assume sympy cannot handle torch. I could try using tensors directly to simplify the code a little. #It shouldn't be an issue to drop out of tensor data types as these results are analytically derived from the timepoints, and do not depend on the NN.  
-        
         du_1 = torch.tensor([])
         Expression = library_config['input_expr'] 
         for order in range(max_order+1):
             if order > 0:
                 Expression = Expression.diff(t)
 
-            x = vedg.Eval_Array_From_Expression(Data_Array, t, Expression)
+            x = vedg.Eval_Array_From_Expression(data, t, Expression)
             x = torch.tensor(x)
             du_1 = torch.cat((du_1, x), dim=1)
             
@@ -76,12 +73,12 @@ def mech_library(data, prediction, library_config):
     #Next use the result of the feedforward pass of the NN to calculate derivatives of your prediction with respect to time. This always corresponds to du_2
     du_2 = prediction #.clone()
     for order in range(1, max_order+1):
-        y = grad(du_2[:, [order-1]], data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0] #removed this '[:, 1:2]' from very end of grad()[] statement # removed ':order+1' from slicing of du_2.
+        y = grad(du_2[:, [order-1]], data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0]
+        #removed '[:, 1:2]' from very end of grad()[] statement
         du_2 = torch.cat((du_2, y), dim=1)
-    #Not sure where the grad_output comes in
     
     Input_Type = library_config['input_type']
-    if not (Input_Type == 'Strain' or Input_Type == 'Stress'):
+    if not (Input_Type == ('Strain' or 'Stress')):
         print('Improper description of input choice. Defaulting to \'Strain\'')
         Input_Type = 'Strain'
     
@@ -93,12 +90,9 @@ def mech_library(data, prediction, library_config):
         Stress = du_1
     
     Strain_t = Strain[:, [1]] # Extract the first time derivative of strain
-    Strain = torch.cat((Strain[:, [0]], Strain[:, 2:]), dim=1) # remove this before it gets put into theta #potentially a neater way to do this.
+    Strain = torch.cat((Strain[:, [0]], Strain[:, 2:]), dim=1) # remove this before it gets put into theta
     Strain *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
     theta = torch.cat((Strain, Stress), dim=1) # I have arbitrarily set the convention of making Strain the first columns of data
-    
-    #samples= du.shape[0]
-    #theta = du.view(samples,-1)# I'm not convinced this line is not redundant and couldn't just have theta = du (maybe du.clone() or du[:,:] or something to avoid pointer issues)
     
     return [Strain_t], theta
 
