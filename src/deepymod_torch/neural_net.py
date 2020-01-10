@@ -53,8 +53,8 @@ def deepmod_init(network_config, library_config):
     
     coeff_vector_list = [torch.randn((total_terms, 1), dtype=torch.float32, requires_grad=True) for _ in torch.arange(output_dim)]
     if library_config.get('coeff_sign', None) == 'positive':
-        coeff_vector_list = [abs(tensor_for_output).detach() for tensor_for_output in coeff_vector_list]
-        
+        coeff_vector_list = [abs(tensor_for_output).detach().requires_grad_() for tensor_for_output in coeff_vector_list]
+    
     sparsity_mask_list = [torch.arange(total_terms) for _ in torch.arange(output_dim)]
 
     return torch_network, coeff_vector_list, sparsity_mask_list
@@ -96,7 +96,6 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     l1 = optim_config['lambda']
     library_function = library_config['type']
     
-    #only idea after much thougfht is to try taking coeff_vector out of list structure for following statement, but this is not of my design, why would it work for Remy and Jan but not me???
     optimizer = torch.optim.Adam([{'params': network.parameters(), 'lr': 0.002}, {'params': coeff_vector_list, 'lr': 0.002}])
 
     # preparing tensorboard writer
@@ -110,7 +109,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
         prediction = network(data)
         time_deriv_list, theta = library_function(data, prediction, library_config)
         sparse_theta_list = [theta[:, sparsity_mask] for sparsity_mask in sparsity_mask_list]
-
+        
         # Scaling
         coeff_vector_scaled_list = [scaling(coeff_vector, sparse_theta, time_deriv) for time_deriv, sparse_theta, coeff_vector in zip(time_deriv_list, sparse_theta_list, coeff_vector_list)]
         
