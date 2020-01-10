@@ -75,7 +75,7 @@ def Check_Need_Overide(sparsity_mask_trial, original_diff_order):
     Expected_State = False
     for coeff_index in range(1, original_diff_order):
         if (coeff_index in sparsity_mask_trial) == Expected_State:
-            if Expected_State = True:
+            if Expected_State == True:
                 return True
             
             Expected_State = True
