@@ -27,7 +27,7 @@ def scaling(weight_vector, library, time_deriv):
     return scaled_weight_vector
 
 
-def threshold(scaled_coeff_vector, coeff_vector):
+def threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, library_config):
     '''
     Performs thresholding of coefficient vector based on the scaled coefficient vector.
     Components greater than the standard deviation of scaled coefficient vector are maintained, rest is set to zero.
@@ -47,8 +47,47 @@ def threshold(scaled_coeff_vector, coeff_vector):
     tensor of size(N)
         tensor containing index location of non-zero components.
     '''
+    
     sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > torch.std(scaled_coeff_vector, dim=0), coeff_vector, torch.zeros_like(scaled_coeff_vector))
-    sparsity_mask = torch.nonzero(sparse_coeff_vector)[:, 0].detach()  # detach it so it doesn't get optimized and throws an error
-    sparse_coeff_vector = sparse_coeff_vector[sparsity_mask].clone().detach().requires_grad_(True)  # so it can be optimized
+    Indices_To_Keep = torch.nonzero(sparse_coeff_vector)[:, 0]
+    Overode = False
+    if library_config.get('Input_Type', None) == ('Strain' or 'Stress'):
+        sparsity_mask_trial = sparsity_mask[Indices_To_Keep]
+        if Check_Need_Overide(sparsity_mask_trial, library_config['diff_order']):
+            Indices_To_Keep = Remove_High_Order(sparse_coeff_vector)
+            Overode = True
+                
+    sparsity_mask = sparsity_mask[Indices_To_Keep].detach()  # detach it so it doesn't get optimized and throws an error
+    sparse_coeff_vector = sparse_coeff_vector[Indices_To_Keep].clone().detach().requires_grad_(True)  # so it can be optimized
 
-    return sparse_coeff_vector, sparsity_mask
+    return sparse_coeff_vector, sparsity_mask, Overode
+
+        
+def Check_Need_Overide(sparsity_mask_trial, original_diff_order):
+    Index_Gap = original_diff_order+1
+        
+    #First check if all pairs are like
+    for coeff_index in range(1, original_diff_order):
+        if (coeff_index in sparsity_mask_trial) != (coeff_index+Index_Gap in sparsity_mask_trial):
+            return True
+        
+    #Next check that no derivatives skipped
+    Expected_State = False
+    for coeff_index in range(1, original_diff_order):
+        if (coeff_index in sparsity_mask_trial) == Expected_State:
+            if Expected_State = True:
+                return True
+            
+            Expected_State = True
+                
+    return False
+
+
+def Remove_High_Order(sparse_coeff_vector):
+    
+    Number_Of_Coeffs = len(sparse_coeff_vector)
+    Low_Index = (Number_Of_Coeffs // 2) - 1
+    
+    Indices_To_Keep = torch.cat((torch.arange(Low_Index), torch.arange(Low_Index+1, Number_Of_Coeffs-1)))
+    
+    return Indices_To_Keep
