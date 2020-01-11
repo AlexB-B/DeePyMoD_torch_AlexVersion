@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import sympy as sp
 import scipy as sci
 import scipy.integrate as integ
+import torch
 
 
 def Eval_Array_From_Expression(Input_Value_Array, Symbol_Variable, Symbolic_Expression):
@@ -18,8 +19,14 @@ def Eval_Array_From_Expression(Input_Value_Array, Symbol_Variable, Symbolic_Expr
             raise
     except:
         Result_Array = np.array([])
-        for Input_Value in Input_Value_Array:
-            Result_Array = np.append(Result_Array, Symbolic_Expression.evalf(subs={Symbol_Variable: Input_Value}))
+        # Both arrays and tensors have a method flatten() meaning by chance the same statement works for both.
+        for Input_Value in Input_Value_Array.flatten():
+            Result_Array = np.append(Result_Array, float(Symbolic_Expression.evalf(subs={Symbol_Variable: Input_Value})))
+        
+        Result_Array = Result_Array.reshape(Input_Value_Array.shape)
+        
+        if type(Input_Value_Array) is torch.Tensor:
+            Result_Array = torch.tensor(Result_Array, dtype=torch.float32)
     
     return Result_Array
 
