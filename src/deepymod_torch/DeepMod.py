@@ -67,6 +67,7 @@ def DeepMoD(data, target, network_config, library_config, optim_config):
         for Overode_Response in Overode_list:
             if Overode_Response:
                 Final = False
+                print('Overode and restarting')
                 break
 
     return coeff_vector_list, sparsity_mask_list, network
