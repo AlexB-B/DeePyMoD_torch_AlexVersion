@@ -53,18 +53,22 @@ def mech_library(data, prediction, library_config):
     max_order = library_config['diff_order']
     
     #Begin by computing the values of the terms corresponding to the input, for which an analytical expression is given. du_1 always corresponds to this. This only needs to be done for the very first epoch, after which the values are known and stored in the library_config dictionary.
+    
     if ('theta_from_input' in library_config) and (library_config['theta_from_input'].shape[0] == data.shape[0]):
         du_1 = library_config['theta_from_input']
     else:
+        '''
+        strain = library_config['strain_func'](data)
+        strain_derivs = library_deriv(data, strain, library_config)[:, 1:]
+        '''
         t = sym.symbols('t', real=True)
         du_1 = torch.tensor([])
         Expression = library_config['input_expr'] 
         for order in range(max_order+1):
             if order > 0:
                 Expression = Expression.diff(t)
-
-            x = vedg.Eval_Array_From_Expression(data, t, Expression)
-            x = torch.tensor(x)
+            
+            x = vedg.Eval_Array_From_Expression(data.detach(), t, Expression)
             du_1 = torch.cat((du_1, x), dim=1)
             
         library_config['theta_from_input'] = du_1
