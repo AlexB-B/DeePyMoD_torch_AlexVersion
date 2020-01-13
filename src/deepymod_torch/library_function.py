@@ -4,7 +4,7 @@ from torch.autograd import grad
 from itertools import combinations, product
 from functools import reduce
 import sys
-import sympy as sym
+#import sympy as sym
 
 sys.path.append('../../')
 import data.Generation.VE_DataGen_Functions as vedg
@@ -54,12 +54,13 @@ def mech_library(data, prediction, library_config):
     
     #Begin by computing the values of the terms corresponding to the input, for which an analytical expression is given. du_1 always corresponds to this. This only needs to be done for the very first epoch, after which the values are known and stored in the library_config dictionary.
     
-    if ('theta_from_input' in library_config) and (library_config['theta_from_input'].shape[0] == data.shape[0]):
-        du_1 = library_config['theta_from_input']
+    if ('input_theta' in library_config) and (library_config['input_theta'].shape[0] == data.shape[0]):
+        input_theta = library_config['input_theta']
     else:
-        '''
-        strain = library_config['strain_func'](data)
-        strain_derivs = library_deriv(data, strain, library_config)[:, 1:]
+        input_data = library_config['input_expr'](data)
+        input_derivs = library_deriv(data, input_data, library_config)[:, 1:]#final indexing is to remove constant column of ones from the beginning
+        input_theta = torch.cat((input_data, input_derivs), dim=1)#the tensor returned by library_derivs does not include the input_data, the 'zeroth' derivative
+        library_config['input_theta'] = input_theta
         '''
         t = sym.symbols('t', real=True)
         du_1 = torch.tensor([])
@@ -71,30 +72,33 @@ def mech_library(data, prediction, library_config):
             x = vedg.Eval_Array_From_Expression(data.detach(), t, Expression)
             du_1 = torch.cat((du_1, x), dim=1)
             
-        library_config['theta_from_input'] = du_1
-    
+        library_config['input_theta'] = du_1
+        '''
     
     #Next use the result of the feedforward pass of the NN to calculate derivatives of your prediction with respect to time. This always corresponds to du_2
+    output_derivs = library_deriv(data, prediction, library_config)[:, 1:]
+    output_theta = torch.cat((prediction, output_derivs), dim=1)
+    '''
     du_2 = prediction #.clone()
     for order in range(1, max_order+1):
         y = grad(du_2[:, [order-1]], data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0]
         #removed '[:, 1:2]' from very end of grad()[] statement
         du_2 = torch.cat((du_2, y), dim=1)
-    
+    '''
     Input_Type = library_config['input_type']
     if not (Input_Type == ('Strain' or 'Stress')):
         print('Improper description of input choice. Defaulting to \'Strain\'')
         Input_Type = 'Strain'
     
     if Input_Type == 'Strain':
-        Strain = du_1
-        Stress = du_2
+        Strain = input_theta
+        Stress = output_theta
     else:
-        Strain = du_2
-        Stress = du_1
+        Strain = output_theta
+        Stress = input_theta
     
-    Strain_t = Strain[:, [1]] # Extract the first time derivative of strain
-    Strain = torch.cat((Strain[:, [0]], Strain[:, 2:]), dim=1) # remove this before it gets put into theta
+    Strain_t = Strain[:, 1:2] # Extract the first time derivative of strain
+    Strain = torch.cat((Strain[:, 0:1], Strain[:, 2:]), dim=1) # remove this before it gets put into theta
     Strain *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
     theta = torch.cat((Strain, Stress), dim=1) # I have arbitrarily set the convention of making Strain the first columns of data
     
