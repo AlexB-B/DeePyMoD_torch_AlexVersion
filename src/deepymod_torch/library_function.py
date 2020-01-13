@@ -58,8 +58,8 @@ def mech_library(data, prediction, library_config):
         input_theta = library_config['input_theta']
     else:
         input_data = library_config['input_expr'](data)
-        input_derivs = library_deriv(data, input_data, library_config)[:, 1:]#final indexing is to remove constant column of ones from the beginning
-        input_theta = torch.cat((input_data, input_derivs), dim=1)#the tensor returned by library_derivs does not include the input_data, the 'zeroth' derivative
+        _, input_derivs = library_deriv(data, input_data, library_config)
+        input_theta = torch.cat((input_data, input_derivs[:, 1:]), dim=1)#indexing is to remove constant column of ones from the beginning of other_input_derivs
         library_config['input_theta'] = input_theta
         '''
         t = sym.symbols('t', real=True)
@@ -76,8 +76,8 @@ def mech_library(data, prediction, library_config):
         '''
     
     #Next use the result of the feedforward pass of the NN to calculate derivatives of your prediction with respect to time. This always corresponds to du_2
-    output_derivs = library_deriv(data, prediction, library_config)[:, 1:]
-    output_theta = torch.cat((prediction, output_derivs), dim=1)
+    _, output_derivs = library_deriv(data, prediction, library_config)
+    output_theta = torch.cat((prediction, output_derivs[:, 1:]), dim=1)
     '''
     du_2 = prediction #.clone()
     for order in range(1, max_order+1):
@@ -144,15 +144,22 @@ def library_deriv(data, prediction, library_config):
     max_order = library_config['diff_order']
     
     dy = grad(prediction, data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0]
-    time_deriv = dy[:, 0:1]
+
+    if dy.shape[1] == 1:
+        #nonsense result
+        time_deriv = torch.ones_like(prediction)
+        diff_column = 0
+    else:
+        time_deriv = dy[:, 0:1]
+        diff_column = 1
     
     if max_order == 0:
         du = torch.ones_like(time_deriv)
     else:
-        du = torch.cat((torch.ones_like(time_deriv), dy[:, 1:2]), dim=1)
+        du = torch.cat((torch.ones_like(dy[:, 0:1]), dy[:, diff_column:diff_column+1]), dim=1)
         if max_order >1:
             for order in np.arange(1, max_order):
-                du = torch.cat((du, grad(du[:, order:order+1], data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0][:, 1:2]), dim=1)
+                du = torch.cat((du, grad(du[:, order:order+1], data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0][:, diff_column:diff_column+1]), dim=1)
 
     return time_deriv, du
 
