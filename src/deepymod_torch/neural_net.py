@@ -157,4 +157,4 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
                 print(coeff_vector[0])
 
     writer.close()
-    return time_deriv_list, theta, coeff_vector_list
+    return time_deriv_list, sparse_theta_list, coeff_vector_list
