@@ -52,7 +52,7 @@ def mech_library(data, prediction, library_config):
     
     max_order = library_config['diff_order']
     
-    #Begin by computing the values of the terms corresponding to the input, for which an analytical expression is given. du_1 always corresponds to this. This only needs to be done for the very first epoch, after which the values are known and stored in the library_config dictionary.
+    #Begin by computing the values of the terms corresponding to the input, for which an analytical expression is given. This only needs to be done for the very first epoch, after which the values are known and stored in the library_config dictionary.
     if ('input_theta' in library_config) and (library_config['input_theta'].shape[0] == data.shape[0]):
         input_theta = library_config['input_theta']
     else:
@@ -63,30 +63,12 @@ def mech_library(data, prediction, library_config):
         
         input_theta = torch.cat((input_data, input_derivs[:, 1:]), dim=1)#indexing is to remove constant column of ones from the beginning of other_input_derivs
         library_config['input_theta'] = input_theta
-        '''
-        t = sym.symbols('t', real=True)
-        du_1 = torch.tensor([])
-        Expression = library_config['input_expr'] 
-        for order in range(max_order+1):
-            if order > 0:
-                Expression = Expression.diff(t)
-            
-            x = vedg.Eval_Array_From_Expression(data.detach(), t, Expression)
-            du_1 = torch.cat((du_1, x), dim=1)
-            
-        library_config['input_theta'] = du_1
-        '''
     
-    #Next use the result of the feedforward pass of the NN to calculate derivatives of your prediction with respect to time. This always corresponds to du_2
+    #Next use the result of the feedforward pass of the NN to calculate derivatives of your prediction with respect to time. 
     _, output_derivs = library_deriv(data, prediction, library_config)
     output_theta = torch.cat((prediction, output_derivs[:, 1:]), dim=1)
-    '''
-    du_2 = prediction #.clone()
-    for order in range(1, max_order+1):
-        y = grad(du_2[:, [order-1]], data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0]
-        #removed '[:, 1:2]' from very end of grad()[] statement
-        du_2 = torch.cat((du_2, y), dim=1)
-    '''
+    
+    #Next identify the Output/Input as Stress/Strain and organise into returned variables
     Input_Type = library_config['input_type']
     if not (Input_Type == ('Strain' or 'Stress')):
         print('Improper description of input choice. Defaulting to \'Strain\'')
