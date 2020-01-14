@@ -53,12 +53,14 @@ def mech_library(data, prediction, library_config):
     max_order = library_config['diff_order']
     
     #Begin by computing the values of the terms corresponding to the input, for which an analytical expression is given. du_1 always corresponds to this. This only needs to be done for the very first epoch, after which the values are known and stored in the library_config dictionary.
-    
     if ('input_theta' in library_config) and (library_config['input_theta'].shape[0] == data.shape[0]):
         input_theta = library_config['input_theta']
     else:
         input_data = library_config['input_expr'](data)
         _, input_derivs = library_deriv(data, input_data, library_config)
+        
+        input_data, input_derivs = input_data.detach(), input_derivs.detach()
+        
         input_theta = torch.cat((input_data, input_derivs[:, 1:]), dim=1)#indexing is to remove constant column of ones from the beginning of other_input_derivs
         library_config['input_theta'] = input_theta
         '''
