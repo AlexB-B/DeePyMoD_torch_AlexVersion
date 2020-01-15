@@ -1,5 +1,4 @@
 import sympy as sym
-import torch
 
 
 def model_params_from_coeffs(coeff_vector, print_expressions=False):
