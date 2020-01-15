@@ -49,14 +49,20 @@ def kelvin_coeff_expressions(coeff_count):
     expanded = sym.expand(full_expression)
     dt = sym.symbols('dt')
     
+    #fix expressions by making coefficient of first derivative of strain equal to 1
+    Strain_t_coeff_expr = -expanded.coeff(eps, 1).coeff(dt, 1)
+    
     #Strain coeffs
-    coeff_expressions_list = [-expanded.coeff(eps, 1).coeff(dt, 0)]
+    coeff_expression = -expanded.coeff(eps, 1).coeff(dt, 0)/Strain_t_coeff_expr
+    coeff_expressions_list = [sym.simplify(coeff_expression)]
     for strain_order in range(2, order+1):
-        coeff_expressions_list += [-expanded.coeff(eps, 1).coeff(dt, strain_order)]
+        coeff_expression = -expanded.coeff(eps, 1).coeff(dt, strain_order)/Strain_t_coeff_expr
+        coeff_expressions_list += [sym.simplify(coeff_expression)]
         
     #Stress coeffs
     for stress_order in range(order+1):
-        coeff_expressions_list += [expanded.coeff(sig, 1).coeff(dt, stress_order)]
+        coeff_expression = expanded.coeff(sig, 1).coeff(dt, stress_order)/Strain_t_coeff_expr
+        coeff_expressions_list += [sym.simplify(coeff_expression)]
     
     return coeff_expressions_list, model_params_list
 
