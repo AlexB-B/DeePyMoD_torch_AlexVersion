@@ -3,10 +3,7 @@ import torch
 from torch.autograd import grad
 from itertools import combinations, product
 from functools import reduce
-import sys
 
-sys.path.append('../../')
-import data.Generation.VE_DataGen_Functions as vedg
 
 def library_poly(prediction, library_config):
     '''
