@@ -35,9 +35,7 @@ def library_poly(prediction, library_config):
     return u
 
 
-def mech_library(data, prediction, library_config):
-    # Not sure if having 2 additional arguements will cause an issue for the deepmod implementation. Might need to build these into the library_config dictionary instead
-    
+def mech_library(data, prediction, library_config):    
     '''
     Constructs a library graph in 1D. Library config is dictionary with required terms.
     
