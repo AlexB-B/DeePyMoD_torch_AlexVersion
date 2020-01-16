@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch
 
@@ -96,14 +97,14 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     l1 = optim_config['lambda']
     library_function = library_config['type']
     
-    optimizer = torch.optim.Adam([{'params': network.parameters(), 'lr': 0.0002}, {'params': coeff_vector_list, 'lr': 0.0002}])
+    optimizer = torch.optim.Adam([{'params': network.parameters(), 'lr': 0.001}, {'params': coeff_vector_list, 'lr': 0.001}])
 
     # preparing tensorboard writer
     writer = SummaryWriter()
     writer.add_custom_scalars(custom_board(coeff_vector_list))
 
     # Training
-    print('Epoch | Total loss | MSE | PI | L1 ')
+    print('Epoch | MSE loss ')
     for iteration in np.arange(max_iterations):
         # Calculating prediction and library
         prediction = network(data)
@@ -158,3 +159,109 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
 
     writer.close()
     return time_deriv_list, sparse_theta_list, coeff_vector_list
+
+
+def train_group_mse(data, target, network, coeff_vector_list, optim_config):
+    '''
+    Trains the deepmod neural network and its coefficient vectors until maximum amount of iterations. Writes diagnostics to
+    runs/ directory which can be analyzed with tensorboard.
+    
+    Parameters
+    ----------
+    data : Tensor of size (N x M)
+        Coordinates corresponding to target data. First column must be time.
+    target : Tensor of size (N x L)
+        Data the NN is supposed to learn.
+    network : pytorch NN sequential module
+        Network to be trained.
+    optim_config : dict
+        Dict containing parameters for training. See DeepMoD docstring.
+    '''
+
+    max_iterations = optim_config['max_iterations']
+
+    optimizer = torch.optim.Adam(network.parameters(), lr=0.001)
+
+    # preparing tensorboard writer
+    writer = SummaryWriter()
+    writer.add_custom_scalars(custom_board(coeff_vector_list))
+    
+    #preparing plot
+    fig, ax1 = plt.subplots()
+
+    ax1.set_xlabel('Time (s)')
+
+    colour = 'tab:blue'
+    ax1.tick_params(axis='y', labelcolor=colour)
+
+    ax2 = ax1.twinx()
+
+    colour = 'tab:red'
+    ax2.set_ylabel('target', color=colour)
+    ax2.plot(data.detach(), target, color=colour)
+    ax2.tick_params(axis='y', labelcolor=colour)
+    colour = 'tab:blue'
+    
+    plt.title('Current prediction ability of network')
+    
+    plt.ion()
+    
+
+    # Training
+    print('Epoch | Total loss | MSE | PI | L1 ')
+    for iteration in np.arange(max_iterations):
+        # Calculating prediction and library
+        prediction = network(data)
+        
+        #Update plot
+        ax1.clear()
+        ax1.set_ylabel('prediction', color=colour)
+        ax1.plot(data.detach(), prediction.detach(), color=colour)
+        align_yaxis(ax1, ax2) # Function not of my design.
+        fig.tight_layout()  # otherwise the right y-label is slightly clipped
+        fig.canvas.draw()
+        plt.show()
+
+        # Calculating MSE
+        MSE_cost_list = torch.mean((prediction - target)**2, dim=0)
+        loss_MSE = torch.sum(MSE_cost_list)
+
+        # Calculating total loss
+        loss = loss_MSE 
+
+        # Optimizer step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+        
+        # Tensorboard stuff
+        if iteration % 50 == 0:
+            writer.add_scalar('Total loss', loss, iteration)
+            for idx in np.arange(len(MSE_cost_list)):
+                # Costs
+                writer.add_scalar('MSE '+str(idx), MSE_cost_list[idx], iteration)
+          #      writer.add_scalar('L1 '+str(idx), l1_cost_list[idx], iteration)
+
+        if iteration % 500 == 0:
+            print(iteration, "%.1E" % loss.item())
+
+    writer.close()
+    return
+
+
+def align_yaxis(ax1, ax2):
+    """Align zeros of the two axes, zooming them out by same ratio"""
+    axes = (ax1, ax2)
+    extrema = [ax.get_ylim() for ax in axes]
+    tops = [extr[1] / (extr[1] - extr[0]) for extr in extrema]
+    # Ensure that plots (intervals) are ordered bottom to top:
+    if tops[0] > tops[1]:
+        axes, extrema, tops = [list(reversed(l)) for l in (axes, extrema, tops)]
+
+    # How much would the plot overflow if we kept current zoom levels?
+    tot_span = tops[1] + 1 - tops[0]
+
+    b_new_t = extrema[0][0] + tot_span * (extrema[0][1] - extrema[0][0])
+    t_new_b = extrema[1][1] - tot_span * (extrema[1][1] - extrema[1][0])
+    axes[0].set_ylim(extrema[0][0], b_new_t)
+    axes[1].set_ylim(t_new_b, extrema[1][1])
