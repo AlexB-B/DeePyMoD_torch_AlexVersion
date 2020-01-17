@@ -2,7 +2,7 @@ from deepymod_torch.neural_net import deepmod_init, train, train_group_mse
 from deepymod_torch.sparsity import scaling, threshold
 
 
-def DeepMoD(data, target, network_config, library_config, optim_config):
+def DeepMoD(data, target, network_config, library_config, optim_config, NN=False):
     '''
     Runs the deepmod algorithm on the supplied dataset. Mostly a convenience function and can be used as
     a basis for more complex training means. First column of data must correspond to time coordinates, spatial coordinates
@@ -39,9 +39,11 @@ def DeepMoD(data, target, network_config, library_config, optim_config):
     '''
 
     optim_config_internal = optim_config.copy()
-
+    
     # Initiating
     network, coeff_vector_list, sparsity_mask_list = deepmod_init(network_config, library_config)
+    if NN:
+        network = NN
     
     original_coeff_vector_list = coeff_vector_list.copy()
         
