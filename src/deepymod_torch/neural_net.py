@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch
 from IPython import display
-import time
 
 from deepymod_torch.sparsity import scaling
 from torch.utils.tensorboard import SummaryWriter
@@ -102,7 +101,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     optimizer_NN = torch.optim.Adam(network.parameters(), lr=0.01)
     optimizer_coeffs = torch.optim.Adam(coeff_vector_list, lr=0.001)
     scheduler_NN = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer_NN, factor=0.5, patience=100, cooldown=50)
-    # I am worried that the lr for the second parameter group (coeff_vector_list) starts off too high. But i do not want teh scheduler to make it small while the MSe has not yet been reduced. It may be necessary to make 2 seperate optimisers if I want 2 seperate schedulers....
+    # I am worried that the lr for the second parameter group (coeff_vector_list) starts off too high. But i do not want the scheduler to make it small while the MSE has not yet been reduced. It may be necessary to make 2 seperate optimisers if I want 2 seperate schedulers....
     
     # preparing tensorboard writer
     writer = SummaryWriter()
@@ -113,7 +112,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     plt.title('Current prediction ability of network')
     ax1.set_xlabel('Time (s)')
     colour = 'tab:blue'
-    ax1.set_ylabel('target', color=colour)
+    ax1.set_ylabel('Target', color=colour)
     ax1.plot(data.detach(), target, color=colour)
     ax1.tick_params(axis='y', labelcolor=colour)
     ax2 = ax1.twinx()
@@ -175,7 +174,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
             
             #Update plot
             ax2.clear()
-            ax2.set_ylabel('prediction', color='tab:red')
+            ax2.set_ylabel('Prediction', color='tab:red')
             ax2.plot(data.detach(), prediction.detach(), color='tab:red')
             display.display(plt.gcf())
             
@@ -188,7 +187,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
 
     writer.close()
     
-    display.clear_output(wait=False)
+    display.clear_output(wait=True)
     print('Epoch | Total loss | MSE | PI | L1 ')
     print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item())
     for coeff_vector in zip(coeff_vector_list, coeff_vector_scaled_list):
