@@ -1,9 +1,9 @@
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import torch
 from IPython import display
-import time
 
 from deepymod_torch.sparsity import scaling
 from torch.utils.tensorboard import SummaryWriter
@@ -102,7 +102,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     optimizer_NN = torch.optim.Adam(network.parameters(), lr=0.01)
     optimizer_coeffs = torch.optim.Adam(coeff_vector_list, lr=0.001)
     scheduler_NN = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer_NN, factor=0.5, patience=100, cooldown=50)
-    # I am worried that the lr for the second parameter group (coeff_vector_list) starts off too high. But i do not want teh scheduler to make it small while the MSe has not yet been reduced. It may be necessary to make 2 seperate optimisers if I want 2 seperate schedulers....
+    # I am worried that the lr for the second parameter group (coeff_vector_list) starts off too high. But i do not want the scheduler to make it small while the MSE has not yet been reduced. It may be necessary to make 2 seperate optimisers if I want 2 seperate schedulers....
     
     # preparing tensorboard writer
     writer = SummaryWriter()
@@ -112,12 +112,14 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     fig, ax1 = plt.subplots()
     plt.title('Current prediction ability of network')
     ax1.set_xlabel('Time (s)')
-    colour = 'tab:blue'
-    ax1.set_ylabel('target', color=colour)
-    ax1.plot(data.detach(), target, color=colour)
+    colour = 'blue'
+    ax1.set_ylabel('Target', color=colour)
+    ax1.plot(data.detach(), target, color=colour, linestyle='None', marker='.', markersize=1)
     ax1.tick_params(axis='y', labelcolor=colour)
     ax2 = ax1.twinx()
     ax2.tick_params(axis='y', labelcolor='tab:red')
+    
+    start_time = time.time()
     
     # Training
     for iteration in np.arange(max_iterations):
@@ -170,13 +172,20 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
                     writer.add_scalar('scaled_coeff ' + str(idx) + ' ' + str(element_idx), element, iteration)
 
         # Printing
-        if iteration % 200 == 0:
+        if iteration % 50 == 0:
             display.clear_output(wait=True)
             
             #Update plot
+            '''
+            if iteration == 0:
+                ax3 = ax1.twinx()
+                ax3.plot(data.detach(), -theta[:, 0].detach(), color='green', linestyle='None', marker='.', markersize=1)
+            '''
+            
             ax2.clear()
-            ax2.set_ylabel('prediction', color='tab:red')
-            ax2.plot(data.detach(), prediction.detach(), color='tab:red')
+            ax2.set_ylabel('Prediction', color='red')
+            ax2.plot(data.detach(), prediction.detach(), color='red', linestyle='None', marker='.', markersize=1)
+            ax2.set_ylim(ax1.get_ylim())
             display.display(plt.gcf())
             
             print('Epoch | Total loss | MSE | PI | L1 ')
@@ -185,16 +194,19 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
                 print(coeff_vector[0])
             
             print('lrs are', optimizer_NN.param_groups[0]['lr'], optimizer_coeffs.param_groups[0]['lr'])
+            seconds = time.time() - start_time
+            print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
 
     writer.close()
     
-    display.clear_output(wait=False)
+    display.clear_output(wait=True)
     print('Epoch | Total loss | MSE | PI | L1 ')
     print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item())
     for coeff_vector in zip(coeff_vector_list, coeff_vector_scaled_list):
         print(coeff_vector[0])
             
     print('lrs are', optimizer_NN.param_groups[0]['lr'], optimizer_coeffs.param_groups[0]['lr'])
+    print('Total time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
             
     return time_deriv_list, sparse_theta_list, coeff_vector_list
 

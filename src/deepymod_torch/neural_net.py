@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn as nn
@@ -111,12 +112,14 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     fig, ax1 = plt.subplots()
     plt.title('Current prediction ability of network')
     ax1.set_xlabel('Time (s)')
-    colour = 'tab:blue'
+    colour = 'blue'
     ax1.set_ylabel('Target', color=colour)
-    ax1.plot(data.detach(), target, color=colour)
+    ax1.plot(data.detach(), target, color=colour, linestyle='None', marker='.', markersize=1)
     ax1.tick_params(axis='y', labelcolor=colour)
     ax2 = ax1.twinx()
     ax2.tick_params(axis='y', labelcolor='tab:red')
+    
+    start_time = time.time()
     
     # Training
     for iteration in np.arange(max_iterations):
@@ -169,13 +172,20 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
                     writer.add_scalar('scaled_coeff ' + str(idx) + ' ' + str(element_idx), element, iteration)
 
         # Printing
-        if iteration % 200 == 0:
+        if iteration % 50 == 0:
             display.clear_output(wait=True)
             
             #Update plot
+            '''
+            if iteration == 0:
+                ax3 = ax1.twinx()
+                ax3.plot(data.detach(), -theta[:, 0].detach(), color='green', linestyle='None', marker='.', markersize=1)
+            '''
+            
             ax2.clear()
-            ax2.set_ylabel('Prediction', color='tab:red')
-            ax2.plot(data.detach(), prediction.detach(), color='tab:red')
+            ax2.set_ylabel('Prediction', color='red')
+            ax2.plot(data.detach(), prediction.detach(), color='red', linestyle='None', marker='.', markersize=1)
+            ax2.set_ylim(ax1.get_ylim())
             display.display(plt.gcf())
             
             print('Epoch | Total loss | MSE | PI | L1 ')
@@ -184,6 +194,8 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
                 print(coeff_vector[0])
             
             print('lrs are', optimizer_NN.param_groups[0]['lr'], optimizer_coeffs.param_groups[0]['lr'])
+            seconds = time.time() - start_time
+            print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
 
     writer.close()
     
@@ -194,6 +206,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
         print(coeff_vector[0])
             
     print('lrs are', optimizer_NN.param_groups[0]['lr'], optimizer_coeffs.param_groups[0]['lr'])
+    print('Total time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
             
     return time_deriv_list, sparse_theta_list, coeff_vector_list
 
