@@ -140,8 +140,8 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
         loss_MSE = torch.sum(MSE_cost_list)
         
         # Calculating L1
-        l1_cost_list = torch.stack([torch.sum(torch.abs(coeff_vector_scaled)) for coeff_vector_scaled in coeff_vector_scaled_list])
-        loss_l1 = l1 * torch.sum(l1_cost_list)
+        l1_cost_list = l1 * torch.stack([torch.sum(torch.abs(coeff_vector_scaled)) for coeff_vector_scaled in coeff_vector_scaled_list])
+        loss_l1 = torch.sum(l1_cost_list)
 
         # Calculating total loss
         loss = loss_MSE + loss_reg + loss_l1
@@ -159,11 +159,13 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
             writer.add_scalar('Total loss', loss, iteration)
             for idx in np.arange(len(MSE_cost_list)):
                 # Costs
+                # Slight inconsistency. Costs are given as they were prior to optimisation step but....
                 writer.add_scalar('MSE '+str(idx), MSE_cost_list[idx], iteration)
                 writer.add_scalar('Regression '+str(idx), reg_cost_list[idx], iteration)
                 writer.add_scalar('L1 '+str(idx), l1_cost_list[idx], iteration)
 
                 # Coefficients
+                # .... but coefficents are given as they are after optimisation
                 for element_idx, element in enumerate(torch.unbind(coeff_vector_list[idx])):
                     writer.add_scalar('coeff ' + str(idx) + ' ' + str(element_idx), element, iteration)
 
