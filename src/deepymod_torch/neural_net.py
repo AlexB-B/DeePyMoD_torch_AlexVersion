@@ -351,6 +351,7 @@ def train_no_equation(data, target, network, coeff_vector_list, library_config, 
     library_function = library_config['type']
     
     optimizer_NN = torch.optim.Adam(network.parameters(), lr=0.001)
+    loss_threshold = 10**-4
 
     # preparing tensorboard writer
     writer = SummaryWriter()
@@ -411,6 +412,10 @@ def train_no_equation(data, target, network, coeff_vector_list, library_config, 
         optimizer_NN.zero_grad()
         loss.backward()
         optimizer_NN.step()
+        
+        if loss < loss_threshold:
+            optimizer.param_groups[0]['lr'] *= 0.1
+            loss_threshold *= 0.1
 
     writer.close()
     
