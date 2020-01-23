@@ -373,6 +373,8 @@ def train_no_equation(data, target, network, coeff_vector_list, library_config, 
     for iteration in np.arange(max_iterations):
         # Calculating prediction and library
         prediction = network(data)
+        if iteration == max_iterations-1:
+            time_deriv_list, theta = library_function(data, prediction, library_config)
         
         # Calculating MSE
         MSE_cost_list = torch.mean((prediction - target)**2, dim=0)
@@ -418,7 +420,5 @@ def train_no_equation(data, target, network, coeff_vector_list, library_config, 
     print('lr is', optimizer_NN.param_groups[0]['lr'])
     seconds = time.time() - start_time
     print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
-    
-    time_deriv_list, theta = library_function(data, prediction, library_config)
             
     return time_deriv_list[0], theta
