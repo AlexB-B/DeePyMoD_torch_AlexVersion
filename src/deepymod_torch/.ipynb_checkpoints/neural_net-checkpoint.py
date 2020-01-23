@@ -318,3 +318,107 @@ def train_group_mse(data, target, network, coeff_vector_list, optim_config):
     print('lr is ', optimizer.param_groups[0]['lr'])
     return
 
+
+def train_no_equation(data, target, network, coeff_vector_list, library_config, optim_config):
+    '''
+    Trains the deepmod neural network and its coefficient vectors until maximum amount of iterations. Writes diagnostics to
+    runs/ directory which can be analyzed with tensorboard.
+    
+    Parameters
+    ----------
+    data : Tensor of size (N x M)
+        Coordinates corresponding to target data. First column must be time.
+    target : Tensor of size (N x L)
+        Data the NN is supposed to learn.
+    network : pytorch NN sequential module
+        Network to be trained.
+    coeff_vector_list : tensor list
+        List of coefficient vectors to be optimized.
+    library_config : dict
+        Dict containing parameters for the library function. See DeepMoD docstring.
+    optim_config : dict
+        Dict containing parameters for training. See DeepMoD docstring.
+    
+    Returns
+    -------
+    time_deriv[0] : tensor 
+        time derivatives after training.
+    theta : tensor
+        library matrix after training.
+    '''
+
+    max_iterations = optim_config['max_iterations']
+    library_function = library_config['type']
+    
+    optimizer_NN = torch.optim.Adam(network.parameters(), lr=0.001)
+
+    # preparing tensorboard writer
+    writer = SummaryWriter()
+    writer.add_custom_scalars(custom_board(coeff_vector_list))
+
+    # preparing plot
+    fig, ax1 = plt.subplots()
+    plt.title('Current prediction ability of network')
+    ax1.set_xlabel('Time (s)')
+    colour = 'blue'
+    ax1.set_ylabel('Target', color=colour)
+    ax1.plot(data.detach(), target, color=colour, linestyle='None', marker='.', markersize=1)
+    ax1.tick_params(axis='y', labelcolor=colour)
+    ax2 = ax1.twinx()
+    ax2.tick_params(axis='y', labelcolor='tab:red')
+    
+    start_time = time.time()
+    
+    # Training
+    for iteration in np.arange(max_iterations):
+        # Calculating prediction and library
+        prediction = network(data)
+        if iteration == max_iterations-1:
+            time_deriv_list, theta = library_function(data, prediction, library_config)
+        
+        # Calculating MSE
+        MSE_cost_list = torch.mean((prediction - target)**2, dim=0)
+        loss_MSE = torch.sum(MSE_cost_list)
+        
+        # Calculating total loss
+        loss = loss_MSE
+
+        # Tensorboard stuff
+        if iteration % 50 == 0:
+            writer.add_scalar('Total loss', loss, iteration)
+            for idx in np.arange(len(MSE_cost_list)):
+                # Costs
+                writer.add_scalar('MSE '+str(idx), MSE_cost_list[idx], iteration)
+
+        # Printing
+        if iteration % 200 == 0:
+            display.clear_output(wait=True)
+            
+            #Update plot
+            ax2.clear()
+            ax2.set_ylabel('Prediction', color='red')
+            ax2.plot(data.detach(), prediction.detach(), color='red', linestyle='None', marker='.', markersize=1)
+            ax2.set_ylim(ax1.get_ylim())
+            display.display(plt.gcf())
+            
+            print('Epoch | MSE loss ')
+            print(iteration, "%.1E" % loss.item())
+            print('lr is', optimizer_NN.param_groups[0]['lr'])
+            seconds = time.time() - start_time
+            print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
+            
+        # Optimizer step
+        optimizer_NN.zero_grad()
+        loss.backward()
+        optimizer_NN.step()
+
+    writer.close()
+    
+    display.clear_output()
+    print('Epoch | MSE loss ')
+    print(iteration, "%.1E" % loss.item())
+    print('lr is', optimizer_NN.param_groups[0]['lr'])
+    seconds = time.time() - start_time
+    print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
+            
+    return time_deriv_list[0], theta
