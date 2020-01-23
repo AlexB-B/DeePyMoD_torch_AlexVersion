@@ -99,9 +99,9 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     l1 = optim_config['lambda']
     library_function = library_config['type']
     
-    optimizer_NN = torch.optim.Adam(network.parameters(), lr=0.01)
+    optimizer_NN = torch.optim.Adam(network.parameters(), lr=0.001)
     optimizer_coeffs = torch.optim.Adam(coeff_vector_list, lr=0.001)
-    scheduler_NN = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer_NN, factor=0.5, patience=100, cooldown=50)
+    #scheduler_NN = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer_NN, factor=0.5, patience=100, cooldown=50)
     # I am worried that the lr for the second parameter group (coeff_vector_list) starts off too high. But i do not want the scheduler to make it small while the MSE has not yet been reduced. It may be necessary to make 2 seperate optimisers if I want 2 seperate schedulers....
     
     # preparing tensorboard writer
@@ -140,19 +140,11 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
         loss_MSE = torch.sum(MSE_cost_list)
         
         # Calculating L1
-        l1_cost_list = torch.stack([torch.sum(torch.abs(coeff_vector_scaled)) for coeff_vector_scaled in coeff_vector_scaled_list])
-        loss_l1 = l1 * torch.sum(l1_cost_list)
+        l1_cost_list = l1 * torch.stack([torch.sum(torch.abs(coeff_vector_scaled)) for coeff_vector_scaled in coeff_vector_scaled_list])
+        loss_l1 = torch.sum(l1_cost_list)
 
         # Calculating total loss
         loss = loss_MSE + loss_reg + loss_l1
-
-        # Optimizer step
-        optimizer_NN.zero_grad()
-        optimizer_coeffs.zero_grad()
-        loss.backward()
-        optimizer_NN.step()
-        optimizer_coeffs.step()
-        scheduler_NN.step(loss)
 
         # Tensorboard stuff
         if iteration % 50 == 0:
@@ -196,15 +188,23 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
             print('lrs are', optimizer_NN.param_groups[0]['lr'], optimizer_coeffs.param_groups[0]['lr'])
             seconds = time.time() - start_time
             print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
+            
+        # Optimizer step
+        optimizer_NN.zero_grad()
+        optimizer_coeffs.zero_grad()
+        loss.backward()
+        optimizer_NN.step()
+        optimizer_coeffs.step()
+        #scheduler_NN.step(loss)
 
     writer.close()
     
-    display.clear_output(wait=True)
+    display.clear_output()
     print('Epoch | Total loss | MSE | PI | L1 ')
     print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item())
     for coeff_vector in zip(coeff_vector_list, coeff_vector_scaled_list):
         print(coeff_vector[0])
-            
+    
     print('lrs are', optimizer_NN.param_groups[0]['lr'], optimizer_coeffs.param_groups[0]['lr'])
     print('Total time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
             
