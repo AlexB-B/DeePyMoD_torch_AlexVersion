@@ -82,6 +82,59 @@ def mech_library(data, prediction, library_config):
     
     return [Strain_t], theta
 
+
+def strain_input_library(data, prediction, library_config):    
+    
+    max_order = library_config['diff_order']
+    
+    #Begin by computing the values of the terms corresponding to the input, for which an analytical expression is given. This only needs to be done for the very first epoch, after which the values are known and stored in the library_config dictionary.
+    if ('input_theta' in library_config) and (library_config['input_theta'].shape[0] == data.shape[0]):
+        input_theta = library_config['input_theta']
+    else:
+        input_data = library_config['input_expr'](data)
+        _, input_derivs = library_deriv(data, input_data, library_config)
+        input_data, input_derivs = input_data.detach(), input_derivs.detach()
+        input_theta = torch.cat((input_data, input_derivs[:, 1:]), dim=1)#indexing is to remove constant column of ones from the beginning of other_input_derivs
+        library_config['input_theta'] = input_theta
+    
+    #Next use the result of the feedforward pass of the NN to calculate derivatives of your prediction with respect to time. 
+    _, output_derivs = library_deriv(data, prediction, library_config)
+    output_theta = torch.cat((prediction, output_derivs[:, 1:]), dim=1)
+    
+    Strain_t = input_theta[:, 1:2] # Extract the first time derivative of strain
+    Strain = torch.cat((input_theta[:, 0:1], input_theta[:, 2:]), dim=1) # remove this before it gets put into theta
+    Strain *= -1
+    theta = torch.cat((Strain, output_theta), dim=1)
+    
+    return [Strain_t], theta
+
+
+def stress_input_library(data, prediction, library_config):    
+    
+    max_order = library_config['diff_order']
+    
+    #Begin by computing the values of the terms corresponding to the input, for which an analytical expression is given. This only needs to be done for the very first epoch, after which the values are known and stored in the library_config dictionary.
+    if ('input_theta' in library_config) and (library_config['input_theta'].shape[0] == data.shape[0]):
+        input_theta = library_config['input_theta']
+    else:
+        input_data = library_config['input_expr'](data)
+        _, input_derivs = library_deriv(data, input_data, library_config)
+        input_data, input_derivs = input_data.detach(), input_derivs.detach()
+        input_theta = torch.cat((input_data, input_derivs[:, 1:]), dim=1)#indexing is to remove constant column of ones from the beginning of other_input_derivs
+        library_config['input_theta'] = input_theta
+    
+    #Next use the result of the feedforward pass of the NN to calculate derivatives of your prediction with respect to time. 
+    _, output_derivs = library_deriv(data, prediction, library_config)
+    output_theta = torch.cat((prediction, output_derivs[:, 1:]), dim=1)
+    
+    Strain_t = output_theta[:, 1:2] # Extract the first time derivative of strain
+    Strain = torch.cat((output_theta[:, 0:1], output_theta[:, 2:]), dim=1) # remove this before it gets put into theta
+    Strain *= -1
+    theta = torch.cat((Strain, input_theta), dim=1)
+    
+    return [Strain_t], theta
+
+
 def mech_library_group(data, prediction, library_config):
     '''
     Here we define a library that contains first and second order derivatives to construct a list of libraries to study a set of different advection diffusion experiments.
