@@ -350,8 +350,8 @@ def train_no_equation(data, target, network, coeff_vector_list, library_config, 
     max_iterations = optim_config['max_iterations']
     library_function = library_config['type']
     
-    optimizer_NN = torch.optim.Adam(network.parameters(), lr=0.001)
-    loss_threshold = 10**-4
+    optimizer = torch.optim.Adam(network.parameters(), lr=0.001)
+    #loss_threshold = 5*10**-5
 
     # preparing tensorboard writer
     writer = SummaryWriter()
@@ -404,25 +404,25 @@ def train_no_equation(data, target, network, coeff_vector_list, library_config, 
             
             print('Epoch | MSE loss ')
             print(iteration, "%.1E" % loss.item())
-            print('lr is', optimizer_NN.param_groups[0]['lr'])
+            print('lr is', optimizer.param_groups[0]['lr'])
             seconds = time.time() - start_time
             print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
             
         # Optimizer step
-        optimizer_NN.zero_grad()
+        optimizer.zero_grad()
         loss.backward()
-        optimizer_NN.step()
-        
+        optimizer.step()
+        '''
         if loss < loss_threshold:
             optimizer.param_groups[0]['lr'] *= 0.1
             loss_threshold *= 0.1
-
+        '''
     writer.close()
     
     display.clear_output()
     print('Epoch | MSE loss ')
     print(iteration, "%.1E" % loss.item())
-    print('lr is', optimizer_NN.param_groups[0]['lr'])
+    print('lr is', optimizer.param_groups[0]['lr'])
     seconds = time.time() - start_time
     print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
             
