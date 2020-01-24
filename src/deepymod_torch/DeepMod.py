@@ -159,6 +159,7 @@ def DeepMoD_no_equation(data, target, network_config, library_config, optim_conf
     # Training of the network
     time_deriv, theta = train_no_equation(data, target, network, coeff_vector_list, library_config, optim_config)
     
-    full_library = torch.cat((theta[:, 0:1], time_deriv, theta[:, 1:]), axis=1)
+    index = theta.shape[1] // 2
+    full_library = torch.cat((-1*theta[:, 0:1], time_deriv, -1*theta[:, 1:index], theta[:, index:]), axis=1)
     
-    return network, full_library
+    return network, full_library.detach()

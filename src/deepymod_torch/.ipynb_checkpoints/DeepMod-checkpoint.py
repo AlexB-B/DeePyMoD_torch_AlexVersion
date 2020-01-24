@@ -161,4 +161,4 @@ def DeepMoD_no_equation(data, target, network_config, library_config, optim_conf
     
     full_library = torch.cat((theta[:, 0:1], time_deriv, theta[:, 1:]), axis=1)
     
-    return network, full_library
+    return network, full_library.detach()
