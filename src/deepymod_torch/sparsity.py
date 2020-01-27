@@ -48,8 +48,8 @@ def threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, library_config):
         tensor containing index location of non-zero components.
     '''
     
-    sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > torch.std(scaled_coeff_vector, dim=0), coeff_vector, torch.zeros_like(scaled_coeff_vector))
-    Indices_To_Keep = torch.nonzero(sparse_coeff_vector)[:, 0]
+    reduced_sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > torch.std(scaled_coeff_vector, dim=0), coeff_vector, torch.zeros_like(scaled_coeff_vector))
+    Indices_To_Keep = torch.nonzero(reduced_sparse_coeff_vector)[:, 0]
     Overode = False
     if library_config.get('input_type', None) == ('Strain' or 'Stress'):        
         sparsity_mask_trial = sparsity_mask[Indices_To_Keep]
