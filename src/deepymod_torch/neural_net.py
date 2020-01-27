@@ -164,7 +164,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
                     writer.add_scalar('scaled_coeff ' + str(idx) + ' ' + str(element_idx), element, iteration)
 
         # Printing
-        if iteration % 50 == 0:
+        if iteration % 200 == 0:
             display.clear_output(wait=True)
             
             #Update plot
@@ -427,3 +427,99 @@ def train_no_equation(data, target, network, coeff_vector_list, library_config, 
     print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
             
     return time_deriv_list[0], theta
+
+
+def train_optim_NN_only(data, target, network, coeff_vector_list, sparsity_mask_list, library_config, optim_config):
+
+    max_iterations = optim_config['max_iterations']
+    l1 = optim_config['lambda']
+    library_function = library_config['type']
+    
+    optimizer_NN = torch.optim.Adam(network.parameters(), lr=0.001)
+    
+    # preparing tensorboard writer
+    writer = SummaryWriter()
+    writer.add_custom_scalars(custom_board(coeff_vector_list))
+
+    # preparing plot
+    fig, ax1 = plt.subplots()
+    plt.title('Current prediction ability of network')
+    ax1.set_xlabel('Time (s)')
+    colour = 'blue'
+    ax1.set_ylabel('Target', color=colour)
+    ax1.plot(data.detach(), target, color=colour, linestyle='None', marker='.', markersize=1)
+    ax1.tick_params(axis='y', labelcolor=colour)
+    ax2 = ax1.twinx()
+    ax2.tick_params(axis='y', labelcolor='tab:red')
+    
+    start_time = time.time()
+    
+    # Training
+    for iteration in np.arange(max_iterations):
+        # Calculating prediction and library
+        prediction = network(data)
+        time_deriv_list, theta = library_function(data, prediction, library_config)
+        sparse_theta_list = [theta[:, sparsity_mask] for sparsity_mask in sparsity_mask_list]
+        
+        # Calculating PI
+        reg_cost_list = torch.stack([torch.mean((time_deriv - sparse_theta @ coeff_vector)**2) for time_deriv, sparse_theta, coeff_vector in zip(time_deriv_list, sparse_theta_list, coeff_vector_list)])
+        loss_reg = torch.sum(reg_cost_list)
+        
+        # Calculating MSE
+        MSE_cost_list = torch.mean((prediction - target)**2, dim=0)
+        loss_MSE = torch.sum(MSE_cost_list)
+
+        # Calculating total loss
+        loss = loss_MSE + loss_reg
+
+        # Tensorboard stuff
+        if iteration % 50 == 0:
+            writer.add_scalar('Total loss', loss, iteration)
+            for idx in np.arange(len(MSE_cost_list)):
+                # Costs
+                writer.add_scalar('MSE '+str(idx), MSE_cost_list[idx], iteration)
+                writer.add_scalar('Regression '+str(idx), reg_cost_list[idx], iteration)
+
+        # Printing
+        if iteration % 200 == 0:
+            display.clear_output(wait=True)
+            
+            #Update plot
+            '''
+            if iteration == 0:
+                ax3 = ax1.twinx()
+                ax3.plot(data.detach(), -theta[:, 0].detach(), color='green', linestyle='None', marker='.', markersize=1)
+            '''
+            
+            ax2.clear()
+            ax2.set_ylabel('Prediction', color='red')
+            ax2.plot(data.detach(), prediction.detach(), color='red', linestyle='None', marker='.', markersize=1)
+            ax2.set_ylim(ax1.get_ylim())
+            display.display(plt.gcf())
+            
+            print('Epoch | Total loss | MSE | PI ')
+            print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item())
+            for coeff_vector in coeff_vector_list:
+                print(coeff_vector)
+                        
+            print('lrs are', optimizer_NN.param_groups[0]['lr'])
+            seconds = time.time() - start_time
+            print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
+            
+        # Optimizer step
+        optimizer_NN.zero_grad()
+        loss.backward()
+        optimizer_NN.step()
+
+    writer.close()
+    
+    display.clear_output()
+    print('Epoch | Total loss | MSE | PI ')
+    print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item())
+    for coeff_vector in coeff_vector_list:
+        print(coeff_vector)
+    
+    print('lrs are', optimizer_NN.param_groups[0]['lr'])
+    print('Total time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
+            
+    return time_deriv_list, sparse_theta_list, coeff_vector_list
