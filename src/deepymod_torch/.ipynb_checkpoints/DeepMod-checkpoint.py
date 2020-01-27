@@ -1,10 +1,10 @@
 import torch
 
-from deepymod_torch.neural_net import deepmod_init, train, train_group_mse, train_no_equation
+from deepymod_torch.neural_net import deepmod_init, train, train_group_mse, train_no_equation, train_optim_NN_only
 from deepymod_torch.sparsity import scaling, threshold
 
 
-def DeepMoD(data, target, network_config, library_config, optim_config, NN=False):
+def DeepMoD(data, target, network_config, library_config, optim_config, NN=False, coeffs=False):
     '''
     Runs the deepmod algorithm on the supplied dataset. Mostly a convenience function and can be used as
     a basis for more complex training means. First column of data must correspond to time coordinates, spatial coordinates
@@ -44,8 +44,10 @@ def DeepMoD(data, target, network_config, library_config, optim_config, NN=False
     
     # Initiating
     network, coeff_vector_list, sparsity_mask_list = deepmod_init(network_config, library_config)
-    if NN:
+    if NN: #Overides network for pretrained network
         network = NN
+    if coeffs: #Overides coeffs for specified coeffs
+        coeff_vector_list, sparsity_mask_list = coeffs
     
     original_coeff_vector_list = coeff_vector_list.copy()
         
@@ -159,6 +161,53 @@ def DeepMoD_no_equation(data, target, network_config, library_config, optim_conf
     # Training of the network
     time_deriv, theta = train_no_equation(data, target, network, coeff_vector_list, library_config, optim_config)
     
-    full_library = torch.cat((theta[:, 0:1], time_deriv, theta[:, 1:]), axis=1)
+    index = theta.shape[1] // 2
+    full_library = torch.cat((-1*theta[:, 0:1], time_deriv, -1*theta[:, 1:index], theta[:, index:]), axis=1)
     
     return network, full_library.detach()
+
+
+def DeepMoD_PINN(data, target, network_config, library_config, optim_config, NN=False, coeffs=False):
+    '''
+    Run DeepMoD as a PINN. The difference is there is no thresholding and selection of terms and no sparsity bias. It's just a straight up simultaneous fit to the data and fit to a given equation. (FYI, this last idea is misleading. I am able to provide the whole equation only in VE case because it is so simple to construct, with an easy to replicate pattern.)
+    '''
+
+    optim_config_internal = optim_config.copy()
+    
+    # Initiating
+    network, coeff_vector_list, sparsity_mask_list = deepmod_init(network_config, library_config)
+    if NN:
+        network = NN
+    if coeffs: #Overides coeffs for specified coeffs
+        coeff_vector_list, sparsity_mask_list = coeffs
+            
+    optim_config_internal['lambda'] = 0
+        
+    # Training of the network
+    time_deriv_list, sparse_theta_list, coeff_vector_list = train(data, target, network, coeff_vector_list, sparsity_mask_list, library_config, optim_config_internal)
+
+    return list(coeff_vector_list), list(sparsity_mask_list), network
+
+
+def DeepMoD_known_eq(data, target, network_config, library_config, optim_config, coeffs, NN=False):
+    '''
+    coeffs actually not optional for this
+    '''
+
+    optim_config_internal = optim_config.copy()
+    
+    # Initiating
+    network, coeff_vector_list, sparsity_mask_list = deepmod_init(network_config, library_config)
+    if NN: #Overides network for pretrained network
+        network = NN
+    coeff_vector_list, sparsity_mask_list = coeffs
+    
+    original_coeff_vector_list = coeff_vector_list.copy()
+            
+    optim_config_internal['lambda'] = 0
+        
+    # Training of the network
+    time_deriv_list, sparse_theta_list, coeff_vector_list = train_optim_NN_only(data, target, network, coeff_vector_list, sparsity_mask_list, library_config, optim_config_internal)
+        
+
+    return list(coeff_vector_list), list(sparsity_mask_list), network
