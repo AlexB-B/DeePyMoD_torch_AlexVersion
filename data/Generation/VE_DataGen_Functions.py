@@ -12,22 +12,24 @@ import torch
 
 def Eval_Array_From_Expression(Input_Value_Array, Symbol_Variable, Symbolic_Expression):
     
-    try:
-        Eval_Func = sp.lambdify(Symbol_Variable, Symbolic_Expression)
-        Result_Array = Eval_Func(Input_Value_Array)
-        if len(Result_Array) != len(Input_Value_Array):
-            raise
+    #try:
+    Eval_Func = sp.lambdify(Symbol_Variable, Symbolic_Expression)
+    Result_Array = Eval_Func(Input_Value_Array)
+    if len(Result_Array) != len(Input_Value_Array):
+        raise
+    '''
     except:
         Result_Array = np.array([])
         # Both arrays and tensors have a method flatten() meaning by chance the same statement works for both.
         for Input_Value in Input_Value_Array.flatten():
-            Result_Array = np.append(Result_Array, float(Symbolic_Expression.evalf(subs={Symbol_Variable: Input_Value})))
+            Result_Array = np.append(Result_Array, Symbolic_Expression.evalf(subs={Symbol_Variable: Input_Value}))
         
+        Result_Array = Result_Array.astype(np.float64)
         Result_Array = Result_Array.reshape(Input_Value_Array.shape)
         
         if type(Input_Value_Array) is torch.Tensor:
             Result_Array = torch.tensor(Result_Array, dtype=torch.float32)
-    
+    '''
     return Result_Array
 
 
@@ -237,7 +239,7 @@ def Eval_Array_From_Expr_w_NumInt(Input_Value_Array, Symbol_Variable, Tuple_of_E
     for Input_Value in Input_Value_Array:
         Ana_Value = Analytical_Term.evalf(subs={Symbol_Variable: Input_Value})
         Num_Value, Num_Error = Numerical_Term_Func(Input_Value)
-        Result_Array = np.append(Result_Array, Ana_Value+Num_Value)
+        Result_Array = np.append(Result_Array, float(Ana_Value+Num_Value))
     
     return Result_Array
 
