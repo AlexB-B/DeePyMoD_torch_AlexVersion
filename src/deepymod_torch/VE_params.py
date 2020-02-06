@@ -18,11 +18,14 @@ def model_params_from_coeffs(coeff_vector, print_expressions=False):
     return model_params_value_list, model_params_mask_list
 
 
-def coeffs_from_model_params(E_mod_list, visc_list):
+def coeffs_from_model_params(E_mod_list, visc_list, print_expressions=False):
     
     coeff_count = len(E_mod_list)*2 - 1
     
     coeff_expression_list, model_params_mask_list = kelvin_coeff_expressions(coeff_count)
+    
+    if print_expressions:
+        print(coeff_expression_list)
     
     coeff_value_list = [coeff_expression.subs(zip(model_params_mask_list, E_mod_list+visc_list)) for coeff_expression in coeff_expression_list]
     
