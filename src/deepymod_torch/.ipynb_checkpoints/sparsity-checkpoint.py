@@ -48,15 +48,17 @@ def threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, library_config):
         tensor containing index location of non-zero components.
     '''
     
-    reduced_sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > torch.std(scaled_coeff_vector, dim=0), coeff_vector, torch.zeros_like(scaled_coeff_vector))
+    #reduced_sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > torch.std(scaled_coeff_vector, dim=0), coeff_vector, torch.zeros_like(scaled_coeff_vector))
+    #Alt threshold condition
+    reduced_sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > 0.15, coeff_vector, torch.zeros_like(scaled_coeff_vector))
     Indices_To_Keep = torch.nonzero(reduced_sparse_coeff_vector)[:, 0]
     Overode = False
-    if library_config.get('input_type', None) == ('Strain' or 'Stress'):        
+    '''
+    if library_config.get('input_type', None) in ('Strain', 'Stress'):        
         sparsity_mask_trial = sparsity_mask[Indices_To_Keep]
         if check_need_overide(sparsity_mask_trial, library_config['diff_order']):
-            Indices_To_Keep = torch.arange(len(sparse_coeff_vector))
+            Indices_To_Keep = torch.arange(len(coeff_vector))
             Overode = True
-            '''
             Indices_To_Keep = remove_high_order(sparse_coeff_vector)
             if len(Indices_To_Keep) == 3:
                 print('Defaulted to minimum library size')
@@ -64,10 +66,10 @@ def threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, library_config):
                 Indices_To_Keep = torch.arange(3)
             else:
                 Overode = True
-            '''
+    '''
                 
     sparsity_mask = sparsity_mask[Indices_To_Keep].detach()  # detach it so it doesn't get optimized and throws an error
-    sparse_coeff_vector = sparse_coeff_vector[Indices_To_Keep].clone().detach().requires_grad_(True)  # so it can be optimized
+    sparse_coeff_vector = coeff_vector[Indices_To_Keep].clone().detach().requires_grad_(True)  # so it can be optimized
 
     return sparse_coeff_vector, sparsity_mask, Overode
 

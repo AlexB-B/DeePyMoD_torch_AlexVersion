@@ -99,6 +99,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     l1 = optim_config['lambda']
     library_function = library_config['type']
     
+    #optimizer = torch.optim.Adam(({'params': network.parameters(), 'lr': 0.001}, {'params': coeff_vector_list, 'lr': 0.001}))
     optimizer_NN = torch.optim.Adam(network.parameters(), lr=0.001)
     optimizer_coeffs = torch.optim.Adam(coeff_vector_list, lr=0.001)
     #scheduler_NN = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer_NN, factor=0.5, patience=100, cooldown=50)
@@ -521,5 +522,68 @@ def train_optim_NN_only(data, target, network, coeff_vector_list, sparsity_mask_
     
     print('lrs are', optimizer_NN.param_groups[0]['lr'])
     print('Total time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
+            
+    return time_deriv_list, sparse_theta_list, coeff_vector_list
+
+
+def train_least_squares(data, target, coeff_vector_list, sparsity_mask_list, library_config, optim_config):
+    '''
+    Trains no neural network but optimises the coeffs based on numerical differentiation of the target
+    hidden but library_function must be an unusual one that does not accept a prediction from the network, but the target data itself, and uses this to precalculate a static library using numerical differentiation from numpy.
+    '''
+
+    max_iterations = optim_config['max_iterations']
+    library_function = library_config['type']
+    
+    optimizer_coeffs = torch.optim.Adam(coeff_vector_list, lr=0.001)
+    
+    # preparing tensorboard writer
+    writer = SummaryWriter()
+    writer.add_custom_scalars(custom_board(coeff_vector_list))
+
+    start_time = time.time()
+    
+    # Calculating prediction and library
+    time_deriv_list, theta = library_function(data, target, library_config)
+    sparse_theta_list = [theta[:, sparsity_mask] for sparsity_mask in sparsity_mask_list]
+    
+    # Training
+    for iteration in np.arange(max_iterations):
+        
+        # Calculating PI
+        reg_cost_list = torch.stack([torch.mean((time_deriv - sparse_theta @ coeff_vector)**2) for time_deriv, sparse_theta, coeff_vector in zip(time_deriv_list, sparse_theta_list, coeff_vector_list)])
+        loss_reg = torch.sum(reg_cost_list)
+
+        # Calculating total loss
+        loss = loss_reg
+
+        # Tensorboard stuff
+        if iteration % 50 == 0:
+            writer.add_scalar('Total loss', loss, iteration)
+            for idx in np.arange(len(reg_cost_list)):
+                # Costs
+                writer.add_scalar('Regression '+str(idx), reg_cost_list[idx], iteration)
+
+                # Coefficients
+                for element_idx, element in enumerate(torch.unbind(coeff_vector_list[idx])):
+                    writer.add_scalar('coeff ' + str(idx) + ' ' + str(element_idx), element, iteration)
+
+
+        # Printing
+        if iteration % 5000 == 0:
+            print('Epoch | PI loss ')
+            print(iteration, "%.1E" % loss.item())
+            for coeff_vector in coeff_vector_list:
+                print(coeff_vector)
+            
+            seconds = time.time() - start_time
+            print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
+            
+        # Optimizer step
+        optimizer_coeffs.zero_grad()
+        loss.backward()
+        optimizer_coeffs.step()
+
+    writer.close()
             
     return time_deriv_list, sparse_theta_list, coeff_vector_list
