@@ -32,57 +32,6 @@ def library_poly(prediction, library_config):
     return u
 
 
-def mech_library_least_squares(data, target, library_config):    
-    
-    max_order = library_config['diff_order']
-    
-    if ('input_theta' in library_config) and (library_config['input_theta'].shape[0] == data.shape[0]):
-        input_theta = library_config['input_theta']
-    else:
-        input_data = library_config['input_expr'](data)
-        _, input_derivs = library_deriv(data, input_data, library_config)
-        input_data, input_derivs = input_data.detach(), input_derivs.detach()
-        input_theta = torch.cat((input_data, input_derivs[:, 1:]), dim=1)#indexing is to remove constant column of ones from the beginning of other_input_derivs
-        library_config['input_theta'] = input_theta
-    
-    if ('output_theta' in library_config) and (library_config['output_theta'].shape[0] == data.shape[0]):
-        output_theta = library_config['output_theta']
-    else:
-        output_theta = torch.tensor(num_derivs(target.numpy(), data.detach().numpy(), max_order), dtype=torch.float32)
-        library_config['output_theta'] = output_theta
-    
-    
-    #Next identify the Output/Input as Stress/Strain and organise into returned variables
-    Input_Type = library_config['input_type']
-    if Input_Type not in ('Strain', 'Stress'):
-        print('Improper description of input choice. Defaulting to \'Strain\'')
-        Input_Type = 'Strain'
-    
-    if Input_Type == 'Strain':
-        Strain = input_theta
-        Stress = output_theta
-    elif Input_Type == 'Stress':
-        Strain = output_theta
-        Stress = input_theta
-    
-    Strain_t = Strain[:, 1:2] # Extract the first time derivative of strain
-    Strain = torch.cat((Strain[:, 0:1], Strain[:, 2:]), dim=1) # remove this before it gets put into theta
-    Strain *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
-    theta = torch.cat((Strain, Stress), dim=1) # I have arbitrarily set the convention of making Strain the first columns of data
-    
-    return [Strain_t], theta
-
-
-def num_derivs(dependent_data, independent_data, diff_order):
-    
-    data_derivs = dependent_data.copy()
-    data_derivs = data_derivs.reshape(-1, 1)
-    for _ in range(diff_order):
-        data_derivs = np.append(data_derivs, np.gradient(data_derivs[:, -1].flatten(), independent_data.flatten()).reshape(-1,1), axis=1)
-    
-    return data_derivs
-
-
 def mech_library(data, prediction, library_config):    
     '''
     Constructs a library graph in 1D. Library config is dictionary with required terms.
