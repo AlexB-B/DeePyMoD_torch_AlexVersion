@@ -162,9 +162,9 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
 
         # Printing
         if iteration % 200 == 0:
-            '''
-            display.clear_output(wait=True)
             
+            display.clear_output(wait=True)
+            '''
             #Update plot
             ax2.clear()
             ax2.set_ylabel('Prediction', color='red')
