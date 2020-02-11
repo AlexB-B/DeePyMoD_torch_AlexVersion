@@ -1,6 +1,5 @@
-from deepymod_torch.neural_net import deepmod_init, train
+from deepymod_torch.neural_net import deepmod_init, train, train_mse
 from deepymod_torch.sparsity import scaling, threshold
-
 
 def DeepMoD(data, target, network_config, library_config, optim_config, NN=False, coeffs=False):
     '''
@@ -53,7 +52,7 @@ def DeepMoD(data, target, network_config, library_config, optim_config, NN=False
     scaled_coeff_vector_list_each_iteration = []
     
     # Initial training to just minimise MSE. coeff_vector_list only necessary for housekeeping.
-    if 'mse_only_iterations' in library_config:
+    if 'mse_only_iterations' in optim_config:
         print('Training MSE only')
         train_mse(data, target, network, coeff_vector_list, optim_config_internal)
     
