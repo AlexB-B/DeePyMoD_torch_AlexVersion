@@ -226,6 +226,8 @@ def train_mse(data, target, network, coeff_vector_list, optim_config):
     writer = SummaryWriter()
     writer.add_custom_scalars(custom_board(coeff_vector_list))
     
+    start_time = time.time()
+    
     # Training
     for iteration in np.arange(max_iterations):
         # Calculating prediction and library
@@ -252,6 +254,8 @@ def train_mse(data, target, network, coeff_vector_list, optim_config):
             print('Epoch | MSE loss ')
             print(iteration, "%.1E" % loss.item())
             print('lr is ', optimizer.param_groups[0]['lr'])
+            seconds = time.time() - start_time
+            print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
 
         # Optimizer step
         optimizer.zero_grad()
