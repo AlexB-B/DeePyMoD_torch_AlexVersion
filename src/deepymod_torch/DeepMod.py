@@ -51,7 +51,12 @@ def DeepMoD(data, target, network_config, library_config, optim_config, NN=False
     coeff_vector_list_each_iteration = []
     sparsity_mask_list_each_iteration = []
     scaled_coeff_vector_list_each_iteration = []
-        
+    
+    # Initial training to just minimise MSE. coeff_vector_list only necessary for housekeeping.
+    if 'mse_only_iterations' in library_config:
+        print('Training MSE only')
+        train_mse(data, target, network, coeff_vector_list, optim_config_internal)
+    
     Final = False
     while True:
         
@@ -62,6 +67,8 @@ def DeepMoD(data, target, network_config, library_config, optim_config, NN=False
             
             optim_config_internal['lambda'] = 0
             optim_config_internal['max_iterations'] = optim_config['final_run_iterations']
+        else:
+            print('Running full training')
         
         # Training of the network
         time_deriv_list, sparse_theta_list, coeff_vector_list = train(data, target, network, coeff_vector_list, sparsity_mask_list, library_config, optim_config_internal)
