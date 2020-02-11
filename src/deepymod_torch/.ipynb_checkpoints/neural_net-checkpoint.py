@@ -199,3 +199,65 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     print('Total time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
     '''
     return time_deriv_list, sparse_theta_list, coeff_vector_list
+
+
+def train_mse(data, target, network, coeff_vector_list, optim_config):
+    '''
+    Trains the deepmod neural network and its coefficient vectors until maximum amount of iterations. Writes diagnostics to
+    runs/ directory which can be analyzed with tensorboard.
+    
+    Parameters
+    ----------
+    data : Tensor of size (N x M)
+        Coordinates corresponding to target data. First column must be time.
+    target : Tensor of size (N x L)
+        Data the NN is supposed to learn.
+    network : pytorch NN sequential module
+        Network to be trained.
+    optim_config : dict
+        Dict containing parameters for training. See DeepMoD docstring.
+    '''
+
+    max_iterations = optim_config['mse_only_iterations']
+
+    optimizer = torch.optim.Adam(network.parameters(), lr=0.001) 
+    
+    # preparing tensorboard writer
+    writer = SummaryWriter()
+    writer.add_custom_scalars(custom_board(coeff_vector_list))
+    
+    # Training
+    for iteration in np.arange(max_iterations):
+        # Calculating prediction and library
+        prediction = network(data)
+
+        # Calculating MSE
+        MSE_cost_list = torch.mean((prediction - target)**2, dim=0)
+        loss_MSE = torch.sum(MSE_cost_list)
+
+        # Calculating total loss
+        loss = loss_MSE 
+        
+        # Tensorboard stuff
+        if iteration % 50 == 0:
+            writer.add_scalar('Total loss', loss, iteration)
+            for idx in np.arange(len(MSE_cost_list)):
+                # Costs
+                writer.add_scalar('MSE '+str(idx), MSE_cost_list[idx], iteration)
+                #writer.add_scalar('L1 '+str(idx), l1_cost_list[idx], iteration)
+
+        if iteration % 200 == 0:
+            display.clear_output(wait=True)
+            
+            print('Epoch | MSE loss ')
+            print(iteration, "%.1E" % loss.item())
+            print('lr is ', optimizer.param_groups[0]['lr'])
+
+        # Optimizer step
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+            
+    writer.close()
+
+    return
