@@ -39,7 +39,7 @@ def kelvin_coeff_expressions(coeff_count):
     order = coeff_count // 2
     
     eps, sig = sym.symbols('epsilon,sigma', real=True)
-    E_0 = sym.symbols('E_0', real=True, negative=False)
+    E_0 = sym.symbols('E^K_0', real=True, negative=False)
     
     #Create and organise Kelvin general equation
     summation, model_params_list = kelvin_sym_sum(order)
@@ -74,8 +74,8 @@ def kelvin_coeff_expressions(coeff_count):
 
 def kelvin_sym_sum(order):
     
-    E_Syms = [sym.symbols('E_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
-    Eta_Syms = [sym.symbols('eta_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
+    E_Syms = [sym.symbols('E^K_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
+    Eta_Syms = [sym.symbols('eta^K_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
     
     all_syms = E_Syms + Eta_Syms
     
@@ -126,7 +126,7 @@ def maxwell_coeff_expressions(coeff_count):
     order = coeff_count // 2
     
     eps, sig = sym.symbols('epsilon,sigma', real=True)
-    E_0 = sym.symbols('E_0', real=True, negative=False)
+    E_0 = sym.symbols('E^M_0', real=True, negative=False)
     
     #Create and organise Kelvin general equation
     summation, model_params_list = maxwell_sym_sum(order)
@@ -161,8 +161,8 @@ def maxwell_coeff_expressions(coeff_count):
 
 def maxwell_sym_sum(order):
     
-    E_Syms = [sym.symbols('E_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
-    Eta_Syms = [sym.symbols('eta_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
+    E_Syms = [sym.symbols('E^M_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
+    Eta_Syms = [sym.symbols('eta^M_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
     
     all_syms = E_Syms + Eta_Syms
     
@@ -173,3 +173,56 @@ def maxwell_sym_sum(order):
         Expression += 1/(1/E_Syms[Branch_Index] + 1/(Eta_Syms[Branch_Index]*dt))
         
     return Expression, all_syms
+
+
+
+# CONVERT BETWEEN MODELS
+
+def maxwell_kelvin_conversions(problem_order):
+    
+    coeff_count = problem_order*2 + 1
+    
+    kelvin_coeff_expression_list, kelvin_model_params_mask_list = kelvin_coeff_expressions(coeff_count)
+    maxwell_coeff_expression_list, maxwell_model_params_mask_list = maxwell_coeff_expressions(coeff_count)
+    
+    coeff_equations_list = [kelvin_coeff_expression - maxwell_coeff_expression for kelvin_coeff_expression, maxwell_coeff_expression in zip(kelvin_coeff_expression_list, maxwell_coeff_expression_list)]
+    
+    maxwell_param_exprs = sym.solve(coeff_equations_list, maxwell_model_params_mask_list)[0]
+    kelvin_param_exprs = sym.solve(coeff_equations_list, kelvin_model_params_mask_list)[0]
+    
+    maxwell_solutions = maxwell_param_exprs, maxwell_model_params_mask_list
+    kelvin_solutions = kelvin_param_exprs, kelvin_model_params_mask_list
+    
+    return maxwell_solutions, kelvin_solutions
+
+
+def maxwell_params_to_kelvin(E_mod_list, visc_list, print_expressions=False):
+    
+    problem_order = len(visc_list)
+    
+    maxwell_solutions, kelvin_solutions = maxwell_kelvin_conversions(problem_order)
+    _, maxwell_model_params_mask_list = maxwell_solutions
+    kelvin_param_exprs, kelvin_model_params_mask_list = kelvin_solutions
+    
+    if print_expressions:
+        print(kelvin_param_exprs)
+        
+    kelvin_params = [kelvin_param_expr.subs(zip(maxwell_model_params_mask_list, E_mod_list+visc_list)) for kelvin_param_expr in kelvin_param_exprs]
+    
+    return kelvin_params, kelvin_model_params_mask_list
+
+
+def kelvin_params_to_maxwell(E_mod_list, visc_list, print_expressions=False):
+    
+    problem_order = len(visc_list)
+    
+    maxwell_solutions, kelvin_solutions = maxwell_kelvin_conversions(problem_order)
+    maxwell_param_exprs, maxwell_model_params_mask_list = maxwell_solutions
+    _, kelvin_model_params_mask_list = kelvin_solutions
+    
+    if print_expressions:
+        print(kelvin_param_exprs)
+        
+    maxwell_params = [maxwell_param_expr.subs(zip(kelvin_model_params_mask_list, E_mod_list+visc_list)) for maxwell_param_expr in maxwell_param_exprs]
+    
+    return maxwell_params, maxwell_model_params_mask_list
