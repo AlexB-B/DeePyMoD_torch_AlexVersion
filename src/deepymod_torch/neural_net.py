@@ -63,7 +63,7 @@ def deepmod_init(network_config, library_config):
     return torch_network, coeff_vector_list, sparsity_mask_list
 
 
-def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_config, optim_config):
+def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_config, optim_config, plot=False):
     '''
     Trains the deepmod neural network and its coefficient vectors until maximum amount of iterations. Writes diagnostics to
     runs/ directory which can be analyzed with tensorboard.
@@ -104,18 +104,19 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     # preparing tensorboard writer
     writer = SummaryWriter()
     writer.add_custom_scalars(custom_board(coeff_vector_list))
-    '''
-    # preparing plot
-    fig, ax1 = plt.subplots()
-    plt.title('Current prediction ability of network')
-    ax1.set_xlabel('Time (s)')
-    colour = 'blue'
-    ax1.set_ylabel('Target', color=colour)
-    ax1.plot(data.detach(), target, color=colour, linestyle='None', marker='.', markersize=1)
-    ax1.tick_params(axis='y', labelcolor=colour)
-    ax2 = ax1.twinx()
-    ax2.tick_params(axis='y', labelcolor='tab:red')
-    '''
+    
+    if plot:
+        # preparing plot
+        fig, ax1 = plt.subplots()
+        plt.title('Current prediction ability of network')
+        ax1.set_xlabel('Time (s)')
+        colour = 'blue'
+        ax1.set_ylabel('Target', color=colour)
+        ax1.plot(data.detach(), target, color=colour, linestyle='None', marker='.', markersize=1)
+        ax1.tick_params(axis='y', labelcolor=colour)
+        ax2 = ax1.twinx()
+        ax2.tick_params(axis='y', labelcolor='tab:red')
+    
     start_time = time.time()
     
     # Training
@@ -164,14 +165,13 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
         if iteration % 200 == 0:
             
             display.clear_output(wait=True)
-            '''
-            #Update plot
-            ax2.clear()
-            ax2.set_ylabel('Prediction', color='red')
-            ax2.plot(data.detach(), prediction.detach(), color='red', linestyle='None', marker='.', markersize=1)
-            ax2.set_ylim(ax1.get_ylim())
-            display.display(plt.gcf())
-            '''
+            if plot:
+                #Update plot
+                ax2.clear()
+                ax2.set_ylabel('Prediction', color='red')
+                ax2.plot(data.detach(), prediction.detach(), color='red', linestyle='None', marker='.', markersize=1)
+                ax2.set_ylim(ax1.get_ylim())
+                display.display(plt.gcf())
             
             print('Epoch | Total loss | MSE | PI | L1 ')
             print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item())
@@ -188,20 +188,11 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
         optimizer.step()
 
     writer.close()
-    '''
-    display.clear_output()
-    print('Epoch | Total loss | MSE | PI | L1 ')
-    print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item())
-    for coeff_vector in zip(coeff_vector_list, coeff_vector_scaled_list):
-        print(coeff_vector[0])
     
-    print('lrs are', optimizer_NN.param_groups[0]['lr'], optimizer_coeffs.param_groups[0]['lr'])
-    print('Total time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
-    '''
     return time_deriv_list, sparse_theta_list, coeff_vector_list
 
 
-def train_mse(data, target, network, coeff_vector_list, optim_config):
+def train_mse(data, target, network, coeff_vector_list, optim_config, plot=False):
     '''
     Trains the deepmod neural network and its coefficient vectors until maximum amount of iterations. Writes diagnostics to
     runs/ directory which can be analyzed with tensorboard.
@@ -225,6 +216,18 @@ def train_mse(data, target, network, coeff_vector_list, optim_config):
     # preparing tensorboard writer
     writer = SummaryWriter()
     writer.add_custom_scalars(custom_board(coeff_vector_list))
+    
+    if plot:
+        # preparing plot
+        fig, ax1 = plt.subplots()
+        plt.title('Current prediction ability of network')
+        ax1.set_xlabel('Time (s)')
+        colour = 'blue'
+        ax1.set_ylabel('Target', color=colour)
+        ax1.plot(data.detach(), target, color=colour, linestyle='None', marker='.', markersize=1)
+        ax1.tick_params(axis='y', labelcolor=colour)
+        ax2 = ax1.twinx()
+        ax2.tick_params(axis='y', labelcolor='tab:red')
     
     start_time = time.time()
     
@@ -251,9 +254,17 @@ def train_mse(data, target, network, coeff_vector_list, optim_config):
         if iteration % 200 == 0:
             display.clear_output(wait=True)
             
+            if plot:
+                #Update plot
+                ax2.clear()
+                ax2.set_ylabel('Prediction', color='red')
+                ax2.plot(data.detach(), prediction.detach(), color='red', linestyle='None', marker='.', markersize=1)
+                ax2.set_ylim(ax1.get_ylim())
+                display.display(plt.gcf())
+            
             print('Epoch | MSE loss ')
             print(iteration, "%.1E" % loss.item())
-            print('lr is ', optimizer.param_groups[0]['lr'])
+            print('lr is', optimizer.param_groups[0]['lr'])
             seconds = time.time() - start_time
             print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
 
