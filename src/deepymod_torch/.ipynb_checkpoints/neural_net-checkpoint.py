@@ -116,7 +116,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
         ax1.tick_params(axis='y', labelcolor=colour)
         ax2 = ax1.twinx()
         ax2.tick_params(axis='y', labelcolor='tab:red')
-    
+
     start_time = time.time()
     
     # Training
@@ -163,8 +163,8 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
 
         # Printing
         if iteration % 200 == 0:
-            
             display.clear_output(wait=True)
+            
             if plot:
                 #Update plot
                 ax2.clear()
@@ -251,7 +251,7 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, plot=False
                 writer.add_scalar('MSE '+str(idx), MSE_cost_list[idx], iteration)
                 #writer.add_scalar('L1 '+str(idx), l1_cost_list[idx], iteration)
 
-        if iteration % 200 == 0:
+        if iteration % 500 == 0:
             display.clear_output(wait=True)
             
             if plot:
