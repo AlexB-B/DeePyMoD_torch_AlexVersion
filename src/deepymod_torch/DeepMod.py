@@ -1,7 +1,10 @@
 from deepymod_torch.neural_net import deepmod_init, train, train_mse
 from deepymod_torch.sparsity import scaling, threshold
 
-def DeepMoD(data, target, network_config, library_config, optim_config, plot=False, NN=False, coeffs=False):
+import numpy as np
+import torch
+
+def DeepMoD(data, target, network_config, library_config, optim_config, plot=False, NN=False):
     '''
     Runs the deepmod algorithm on the supplied dataset. Mostly a convenience function and can be used as
     a basis for more complex training means. First column of data must correspond to time coordinates, spatial coordinates
@@ -43,8 +46,6 @@ def DeepMoD(data, target, network_config, library_config, optim_config, plot=Fal
     network, coeff_vector_list, sparsity_mask_list = deepmod_init(network_config, library_config)
     if NN: #Overides network for pretrained network
         network = NN
-    if coeffs: #Overides coeffs for specified coeffs
-        coeff_vector_list, sparsity_mask_list = coeffs
     
     original_coeff_vector_list = coeff_vector_list.copy()
     coeff_vector_list_each_iteration = []
@@ -55,6 +56,13 @@ def DeepMoD(data, target, network_config, library_config, optim_config, plot=Fal
     if 'mse_only_iterations' in optim_config:
         print('Training MSE only')
         train_mse(data, target, network, coeff_vector_list, optim_config_internal, plot=plot)
+    
+    if optim_config.get('do_lstsq_approx', False):
+        # Make initial guess at coeffs
+        prediction = network(data)
+        time_deriv_list, theta = library_config['type'](data, prediction, library_config)
+        x_list = [np.linalg.lstsq(theta.detach(), time_deriv_list[idx].detach(), rcond=None)[0] for idx in range(prediction.shape[1])]
+        coeff_vector_list = [torch.tensor(x, dtype=torch.float32, requires_grad=True) for x in x_list]
     
     Final = False
     while True:
