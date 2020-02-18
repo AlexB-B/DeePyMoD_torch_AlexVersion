@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.integrate as integ
 import sympy as sym
+import torch
 
 import deepymod_torch.VE_params as VE_params
 
@@ -72,6 +73,61 @@ def relax_creep(E_mods, viscs, input_type):
         relax_creep_lambda = False
     
     return relax_creep_lambda
+
+
+def wave_packet_lambdas_sum(freq_max, freq_step, std_dev):
+    
+    # changing freq_max changes the 'detail' in the wave packet.
+    # Changing the freq_step changes the seperation of the wave packets.
+    # changing the std_dev changes the size of the wavepacket.
+    # replacing the gaussian weighting of the discrete waves with a constant makes the wavepacket look like a sinc function.
+    
+    # In terms of time to calculate, this scales much more poorly than wave_packet_lambdas_integ.
+    # small freq_step slows these lambdas down in a linear fashion.
+    # For sufficiently small freq_step and large evaluation range, the two can take equally long.
+    
+    mean = freq_max/2
+    
+    omega_array = np.arange(0, freq_max, freq_step)
+    
+    output_lambda = lambda t: freq_step*sum([np.exp(-((omega-mean)**2)/(2*std_dev**2))*np.sin(omega*t) for omega in omega_array])
+    d_output_lambda = lambda t: freq_step*sum([omega*np.exp(-((omega-mean)**2)/(2*std_dev**2))*np.cos(omega*t) for omega in omega_array])
+    
+    torch_output_lambda = lambda t: freq_step*sum([np.exp(-((omega-mean)**2)/(2*std_dev**2))*torch.sin(omega*t) for omega in omega_array])
+    
+    return output_lambda, d_output_lambda, torch_output_lambda
+
+
+def wave_packet_lambdas_integ(freq_max, std_dev):
+    
+    # changing freq_max changes the 'detail' in the wave packet.
+    # changing the std_dev changes the size of the wavepacket.
+    # replacing the gaussian weighting of the discrete waves with a constant makes the wavepacket look like a sinc function.
+    
+    # This method using numerical integration arguably produces a closer approximation of the ideal wavepacket [than wave_packet_lambdas_sum] but:
+    # - is arguably less transparent
+    # - In terms of time to calculate, this generally takes longer than wave_packet_lambdas_sum as a result mostly of the integration (np.gradient is fast).
+    #   Evaluating the lambdas over large time ranges slows these lambdas down.
+    #   For sufficiently small freq_step and large evaluation range, the two can take equally long.
+    # - If the additional arguement of freq_step is small, is indistinguishable from from lambda from wave_packet_lambdas_sum.
+    # - generates a warning flag at large evaluation ranges.
+    
+    mean = freq_max/2
+    
+    half_deriv_range = 5
+    deriv_steps = 101
+    middle = deriv_steps // 2
+    
+    integrand_lambda = lambda omega, t: np.exp(-((omega-mean)**2)/(2*std_dev**2)) * np.sin(omega*t)
+    output_lambda = lambda t: integ.quad(integrand_lambda, 0, freq_max, args=(t))[0]
+    array_output_lambda = lambda t_array: np.array([integ.quad(integrand_lambda, 0, freq_max, args=(t))[0] for t in t_array])
+    d_output_lambda = lambda t: np.gradient(array_output_lambda(np.linspace(t-half_deriv_range, t+half_deriv_range, deriv_steps)), 
+                                            np.linspace(t-half_deriv_range, t+half_deriv_range, deriv_steps))[middle]
+    
+    torch_integrand_lambda = lambda omega, t: torch.exp(-((omega-mean)**2)/(2*std_dev**2)) * torch.sin(omega*t)
+    torch_output_lambda = lambda t_tensor: integ.quad(torch_integrand_lambda, 0, freq_max, args=(t))[0]
+    
+    return output_lambda, d_output_lambda, torch_output_lambda
 
 
 #Data Validation routines
