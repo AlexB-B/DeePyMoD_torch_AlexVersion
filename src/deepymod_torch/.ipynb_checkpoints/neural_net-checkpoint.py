@@ -115,7 +115,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
         ax1.plot(data.detach(), target, color=colour, linestyle='None', marker='.', markersize=1)
         ax1.tick_params(axis='y', labelcolor=colour)
         ax2 = ax1.twinx()
-        ax2.tick_params(axis='y', labelcolor='tab:red')
+        ax2.tick_params(axis='y', labelcolor='red')
 
     start_time = time.time()
     
