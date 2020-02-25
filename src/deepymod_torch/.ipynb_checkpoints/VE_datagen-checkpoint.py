@@ -75,6 +75,55 @@ def relax_creep(E_mods, viscs, input_type):
     return relax_creep_lambda
 
 
+def calculate_strain_finite_difference(time_array, input_expr, E_mods, viscs):
+    # input is stress
+    
+    E_mods_1plus_array = np.array(E_mods[1:]).reshape(-1,1)
+    viscs_array = np.array(viscs).reshape(-1,1)
+    
+    delta_t = time_array[1] - time_array[0]
+    
+    stress = np.array([])
+    strain_i = np.zeros(viscs_array.shape)
+    strain = np.array([])
+    for t in time_array:
+        stress = np.append(stress, input_expr(t))
+        # In below line, need to remember that stress[-1] refers to stress(t) whereas strain_i[:, -1] refers to strain_i(t-delta_t) as stress is one element longer after previous line
+        strain_i = np.append(strain_i, (delta_t*stress[-1] + viscs_array*strain_i[:, -1])/(delta_t*E_mods_1plus_array + viscs_array), axis=1)
+        # Now strain_i[:, -1] refers to strain_i(t)
+        strain = np.append(strain, stress[-1]/E_mods[0] + np.sum(strain_i[:, -1]))
+    
+    stress = stress.reshape(-1,1)
+    strain = strain.reshape(-1,1)
+    
+    return strain, stress
+
+
+def calculate_stress_finite_difference(time_array, input_expr, E_mods, viscs):
+    # input is strain
+    
+    E_mods_1plus_array = np.array(E_mods[1:]).reshape(-1,1)
+    viscs_array = np.array(viscs).reshape(-1,1)
+    taus = viscs_array/E_mods_1plus_array
+    
+    delta_t = time_array[1] - time_array[0]
+
+    strain = np.zeros(1)
+    stress = np.array([])
+    stress_i = np.zeros(viscs_array.shape)
+    for t in time_array:
+        strain = np.append(strain, input_expr(t))
+        # In below line, need to remember that strain[-1] refers to strain(t) and strain[-2] refers to strain(t-delta_t), whereas stress_i[:, -1] refers to stress_i(t-delta_t) as strain is one element longer after previous line.
+        stress_i = np.append(stress_i, (E_mods_1plus_array*(strain[-1] - strain[-2]) + stress_i[:, -1])/(1 + delta_t/taus), axis=1)
+        # Now stress_i[:, -1] refers to stress_i(t)
+        stress = np.append(stress, strain[-1]*E_mods[0] + np.sum(stress_i[:, -1]))
+    
+    stress = stress.reshape(-1,1)
+    strain = strain[1:].reshape(-1,1)
+    
+    return strain, stress
+
+
 def wave_packet_lambdas_sum(freq_max, freq_step, std_dev):
     
     # changing freq_max changes the 'detail' in the wave packet.
