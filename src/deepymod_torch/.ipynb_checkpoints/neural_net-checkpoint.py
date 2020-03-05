@@ -51,15 +51,15 @@ def deepmod_init(network_config, library_config):
 
     sample_data = torch.ones(1, input_dim, requires_grad=True)  # we run a single forward pass on fake data to infer shapes
     sample_prediction = torch_network(sample_data)
-    _, theta = library_function(sample_data, sample_prediction, library_config)
+    time_deriv_list, theta = library_function(sample_data, sample_prediction, library_config)
     total_terms = theta.shape[1]
     
-    coeff_vector_list = [torch.randn((total_terms, 1), dtype=torch.float32, requires_grad=True) for _ in torch.arange(output_dim)]
+    coeff_vector_list = [torch.randn((total_terms, 1), dtype=torch.float32, requires_grad=True) for _ in time_deriv_list]
     if library_config.get('coeff_sign', None) == 'positive':
         coeff_vector_list = [abs(tensor_for_output).detach().requires_grad_() for tensor_for_output in coeff_vector_list]
     
-    sparsity_mask_list = [torch.arange(total_terms) for _ in torch.arange(output_dim)]
-
+    sparsity_mask_list = [torch.arange(total_terms) for _ in time_deriv_list]
+    
     return torch_network, coeff_vector_list, sparsity_mask_list
 
 
@@ -99,23 +99,14 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     l1 = optim_config['lambda']
     library_function = library_config['type']
     
-    optimizer = torch.optim.Adam(({'params': network.parameters(), 'lr': 0.001}, {'params': coeff_vector_list, 'lr': 0.001}))
+    optimizer = torch.optim.Adam(({'params': network.parameters(), 'lr': 0.001}, {'params': coeff_vector_list, 'lr': 0.004}))
  
     # preparing tensorboard writer
     writer = SummaryWriter()
-    writer.add_custom_scalars(custom_board(coeff_vector_list))
+    writer.add_custom_scalars(custom_board(target, coeff_vector_list))
     
-    if plot:
-        # preparing plot
-        fig, ax1 = plt.subplots()
-        plt.title('Current prediction ability of network')
-        ax1.set_xlabel('Time (s)')
-        colour = 'blue'
-        ax1.set_ylabel('Target', color=colour)
-        ax1.plot(data.detach(), target, color=colour, linestyle='None', marker='.', markersize=1)
-        ax1.tick_params(axis='y', labelcolor=colour)
-        ax2 = ax1.twinx()
-        ax2.tick_params(axis='y', labelcolor='red')
+    if plot: # only works for ODEs (one independant variable)
+        axes1, axes2 = prep_plot(data, target)
 
     start_time = time.time()
     
@@ -150,6 +141,8 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
             for idx in np.arange(len(MSE_cost_list)):
                 # Costs
                 writer.add_scalar('MSE '+str(idx), MSE_cost_list[idx], iteration)
+            
+            for idx in np.arange(len(reg_cost_list)):
                 writer.add_scalar('Regression '+str(idx), reg_cost_list[idx], iteration)
                 writer.add_scalar('L1 '+str(idx), l1_cost_list[idx], iteration)
 
@@ -166,12 +159,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
             display.clear_output(wait=True)
             
             if plot:
-                #Update plot
-                ax2.clear()
-                ax2.set_ylabel('Prediction', color='red')
-                ax2.plot(data.detach(), prediction.detach(), color='red', linestyle='None', marker='.', markersize=1)
-                ax2.set_ylim(ax1.get_ylim())
-                display.display(plt.gcf())
+                update_plot(axes1, axes2, data, prediction)
             
             print('Epoch | Total loss | MSE | PI | L1 ')
             print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item())
@@ -215,19 +203,10 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, plot=False
     
     # preparing tensorboard writer
     writer = SummaryWriter()
-    writer.add_custom_scalars(custom_board(coeff_vector_list))
+    writer.add_custom_scalars(custom_board(target, coeff_vector_list))
     
     if plot:
-        # preparing plot
-        fig, ax1 = plt.subplots()
-        plt.title('Current prediction ability of network')
-        ax1.set_xlabel('Time (s)')
-        colour = 'blue'
-        ax1.set_ylabel('Target', color=colour)
-        ax1.plot(data.detach(), target, color=colour, linestyle='None', marker='.', markersize=1)
-        ax1.tick_params(axis='y', labelcolor=colour)
-        ax2 = ax1.twinx()
-        ax2.tick_params(axis='y', labelcolor='tab:red')
+        axes1, axes2 = prep_plot(data, target)
     
     start_time = time.time()
     
@@ -255,12 +234,7 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, plot=False
             display.clear_output(wait=True)
             
             if plot:
-                #Update plot
-                ax2.clear()
-                ax2.set_ylabel('Prediction', color='red')
-                ax2.plot(data.detach(), prediction.detach(), color='red', linestyle='None', marker='.', markersize=1)
-                ax2.set_ylim(ax1.get_ylim())
-                display.display(plt.gcf())
+                update_plot(axes1, axes2, data, prediction)
             
             print('Epoch | MSE loss ')
             print(iteration, "%.1E" % loss.item())
@@ -276,3 +250,34 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, plot=False
     writer.close()
 
     return
+
+
+def prep_plot(data, target):
+    
+    number_graphs = target.shape[1]
+    fig, axes1 = plt.subplots(ncols=number_graphs, squeeze=False, figsize=(6.4*number_graphs, 4.8)) # 6.4 and 4.8 are the default graph plot dimensions
+    axes1 = axes1.flatten()
+    plt.title('Current prediction ability of network')
+    colour = 'blue'
+    axes2 = np.array([])
+    for col, ax1 in enumerate(axes1):
+        ax1.set_xlabel('Time (s)')
+        ax1.set_ylabel('Target', color=colour)
+        ax1.plot(data.detach(), target[:, col], color=colour, linestyle='None', marker='.', markersize=1)
+        ax1.tick_params(axis='y', labelcolor=colour)
+        axes2 = np.append(axes2, ax1.twinx())
+        axes2[col].tick_params(axis='y', labelcolor='red')
+    
+    return axes1, axes2
+
+
+def update_plot(axes1, axes2, data, prediction):
+    
+    for col, ax2 in enumerate(axes2):
+        ax2.clear()
+        ax2.set_ylabel('Prediction', color='red')
+        ax2.plot(data.detach(), prediction[:, col].detach(), color='red', linestyle='None', marker='.', markersize=1)
+        ax2.set_ylim(axes1[col].get_ylim())
+        
+    plt.tight_layout()
+    display.display(plt.gcf())
