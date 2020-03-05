@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def custom_board(coeff_vector_list):
+def custom_board(target, coeff_vector_list):
     '''
     Constructs a dict containing the layout for a custom scalar board for tensorboard. Shapes and amount of plots are inferred from the
     coefficient vector list.
@@ -18,7 +18,7 @@ def custom_board(coeff_vector_list):
     '''
 
     # Initial setup, including all the costs and losses
-    custom_board = {'Costs': {'MSE': ['Multiline', ['MSE_' + str(idx) for idx in np.arange(len(coeff_vector_list))]],
+    custom_board = {'Costs': {'MSE': ['Multiline', ['MSE_' + str(idx) for idx in np.arange(target.shape[1])]],
                               'Regression': ['Multiline', ['Regression_' + str(idx) for idx in np.arange(len(coeff_vector_list))]],
                               'L1': ['Multiline', ['L1_' + str(idx) for idx in np.arange(len(coeff_vector_list))]]},
                     'Coefficients': {},
