@@ -1,7 +1,6 @@
 from deepymod_torch.neural_net import deepmod_init, train, train_mse
 from deepymod_torch.sparsity import scaling, threshold
 
-import time
 import numpy as np
 import torch
 
@@ -62,7 +61,7 @@ def DeepMoD(data, target, network_config, library_config, optim_config, plot=Fal
         # Make initial guess at coeffs
         prediction = network(data)
         time_deriv_list, theta = library_config['type'](data, prediction, library_config)
-        x_list = [np.linalg.lstsq(theta.detach(), time_deriv_list[idx].detach(), rcond=None)[0] for idx in range(prediction.shape[1])]
+        x_list = [np.linalg.lstsq(theta.detach(), time_deriv.detach(), rcond=None)[0] for time_deriv in time_deriv_list]
         coeff_vector_list = [torch.tensor(x, dtype=torch.float32, requires_grad=True) for x in x_list]
     
     Final = False
