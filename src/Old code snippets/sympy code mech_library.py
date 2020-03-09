@@ -17,3 +17,5 @@
         y = grad(du_2[:, [order-1]], data, grad_outputs=torch.ones_like(prediction), create_graph=True)[0]
         #removed '[:, 1:2]' from very end of grad()[] statement
         du_2 = torch.cat((du_2, y), dim=1)
+
+# comment from windows. does git work???
