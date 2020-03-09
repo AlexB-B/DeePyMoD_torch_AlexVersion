@@ -18,4 +18,4 @@
         #removed '[:, 1:2]' from very end of grad()[] statement
         du_2 = torch.cat((du_2, y), dim=1)
 
-# comment from windows. does git work???
+# comment from windows.
