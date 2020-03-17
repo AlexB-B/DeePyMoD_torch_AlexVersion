@@ -98,8 +98,9 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     max_iterations = optim_config['max_iterations']
     l1 = optim_config['lambda']
     library_function = library_config['type']
+    lr_coeffs = optim_config.get('lr_coeffs', 0.001)
     
-    optimizer = torch.optim.Adam(({'params': network.parameters(), 'lr': 0.001}, {'params': coeff_vector_list, 'lr': optim_config['lr_coeffs']}))
+    optimizer = torch.optim.Adam(({'params': network.parameters(), 'lr': 0.001}, {'params': coeff_vector_list, 'lr': lr_coeffs}))
  
     # preparing tensorboard writer
     writer = SummaryWriter()
