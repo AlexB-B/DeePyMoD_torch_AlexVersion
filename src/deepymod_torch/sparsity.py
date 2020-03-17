@@ -50,7 +50,7 @@ def threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, library_config):
     
     #reduced_sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > torch.std(scaled_coeff_vector, dim=0), coeff_vector, torch.zeros_like(scaled_coeff_vector))
     #Alt threshold condition
-    reduced_sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > 0.08, coeff_vector, torch.zeros_like(scaled_coeff_vector))
+    reduced_sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > 0.05, coeff_vector, torch.zeros_like(scaled_coeff_vector))
     Indices_To_Keep = torch.nonzero(reduced_sparse_coeff_vector)[:, 0]    
     sparsity_mask = sparsity_mask[Indices_To_Keep].detach()  # detach it so it doesn't get optimized and throws an error
     sparse_coeff_vector = coeff_vector[Indices_To_Keep].clone().detach().requires_grad_(True)  # so it can be optimized
