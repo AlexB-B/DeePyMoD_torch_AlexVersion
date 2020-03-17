@@ -1,3 +1,4 @@
+import numpy as np
 import sympy as sym
 
 
@@ -226,3 +227,52 @@ def kelvin_params_to_maxwell(E_mod_list, visc_list, print_expressions=False):
     maxwell_params = [maxwell_param_expr.subs(zip(kelvin_model_params_mask_list, E_mod_list+visc_list)) for maxwell_param_expr in maxwell_param_exprs]
     
     return maxwell_params, maxwell_model_params_mask_list
+
+
+# SCALE COEFFS DUE TO 'NORMALISATION'
+
+def scaled_coeffs_from_true(true_coeffs, time_sf, strain_sf, stress_sf):
+    
+    true_coeffs_array = np.array(true_coeffs)
+    alpha_array = coeff_scaling_values(true_coeffs_array, time_sf, strain_sf, stress_sf)
+    scaled_coeff_guess = true_coeffs_array*alpha_array
+    
+    return list(scaled_coeff_guess)
+
+
+def true_coeffs_from_scaled(scaled_coeffs, time_sf, strain_sf, stress_sf):
+    
+    scaled_coeffs_array = np.array(scaled_coeffs)
+    alpha_array = coeff_scaling_values(scaled_coeffs_array, time_sf, strain_sf, stress_sf)
+    true_coeffs = scaled_coeffs_array/alpha_array
+    
+    return list(true_coeffs)
+
+
+def coeff_scaling_values(coeffs, time_sf, strain_sf, stress_sf):
+    
+    middle_index = len(coeffs)//2
+
+    # calculate alpha_n for each term on RHS
+    alpha_n_array = np.ones(coeffs.shape)
+
+    # split into subarrays that modify in place original due to mutability of arrays
+    # but allows for easier indexing.
+    strain_subarray = alpha_n_array[:middle_index]
+    stress_subarray = alpha_n_array[middle_index:]
+
+    # apply dependant variable scaling of alpha_n
+    strain_subarray *= strain_sf
+    stress_subarray *= stress_sf
+
+    # apply independant variable scaling of alpha_n
+    stress_subarray[1] /= time_sf
+    for idx in range(2, middle_index + 1):
+        strain_subarray[idx-1] /= time_sf**idx
+        stress_subarray[idx] /= time_sf**idx
+
+    alpha_LHS = strain_sf/time_sf
+
+    alpha_array = alpha_LHS/alpha_n_array
+    
+    return alpha_array
