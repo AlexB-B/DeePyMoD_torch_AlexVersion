@@ -63,24 +63,24 @@ def mech_library(data, prediction, library_config):
     output_theta = torch.cat((prediction, output_derivs[:, 1:]), dim=1)
     
     #Next identify the Output/Input as Stress/Strain and organise into returned variables
-    Input_Type = library_config['input_type']
-    if Input_Type not in ('Strain', 'Stress'):
+    input_type = library_config['input_type']
+    if input_type not in ('Strain', 'Stress'):
         print('Improper description of input choice. Defaulting to \'Strain\'')
-        Input_Type = 'Strain'
+        input_type = 'Strain'
     
-    if Input_Type == 'Strain':
-        Strain = input_theta
-        Stress = output_theta
+    if input_type == 'Strain':
+        strain = input_theta
+        stress = output_theta
     else:
-        Strain = output_theta
-        Stress = input_theta
+        strain = output_theta
+        stress = input_theta
     
-    Strain_t = Strain[:, 1:2] # Extract the first time derivative of strain
-    Strain = torch.cat((Strain[:, 0:1], Strain[:, 2:]), dim=1) # remove this before it gets put into theta
-    Strain *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
-    theta = torch.cat((Strain, Stress), dim=1) # I have arbitrarily set the convention of making Strain the first columns of data
+    strain_t = strain[:, 1:2] # Extract the first time derivative of strain
+    strain = torch.cat((strain[:, 0:1], strain[:, 2:]), dim=1) # remove this before it gets put into theta
+    strain *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
+    theta = torch.cat((strain, stress), dim=1) # I have arbitrarily set the convention of making Strain the first columns of data
     
-    return [Strain_t], theta
+    return [strain_t], theta
 
 
 def mech_library_real(data, prediction, library_config):    
