@@ -98,8 +98,10 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     max_iterations = optim_config['max_iterations']
     l1 = optim_config['lambda']
     library_function = library_config['type']
+    lr_coeffs = optim_config.get('lr_coeffs', 0.001) # default is default for optimizer
+    betas_coeffs = optim_config.get('betas_coeffs', (0.9, 0.999)) # default is default for optimizer
     
-    optimizer = torch.optim.Adam(({'params': network.parameters(), 'lr': 0.001}, {'params': coeff_vector_list, 'lr': optim_config['lr_coeffs']}))
+    optimizer = torch.optim.Adam(({'params': network.parameters()}, {'params': coeff_vector_list, 'lr': lr_coeffs, 'betas': betas_coeffs}))
  
     # preparing tensorboard writer
     writer = SummaryWriter()
@@ -166,7 +168,6 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
             for coeff_vector in zip(coeff_vector_list, coeff_vector_scaled_list):
                 print(coeff_vector[0])
             
-            print('lrs are', optimizer.param_groups[0]['lr'], optimizer.param_groups[1]['lr'])
             seconds = time.time() - start_time
             print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
             
@@ -199,7 +200,7 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, plot=False
 
     max_iterations = optim_config['mse_only_iterations']
 
-    optimizer = torch.optim.Adam(network.parameters(), lr=0.001) 
+    optimizer = torch.optim.Adam(network.parameters()) 
     
     # preparing tensorboard writer
     writer = SummaryWriter()
@@ -238,7 +239,6 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, plot=False
             
             print('Epoch | MSE loss ')
             print(iteration, "%.1E" % loss.item())
-            print('lr is', optimizer.param_groups[0]['lr'])
             seconds = time.time() - start_time
             print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
 
