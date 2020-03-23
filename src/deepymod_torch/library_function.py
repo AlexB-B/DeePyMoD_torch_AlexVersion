@@ -64,17 +64,19 @@ def mech_library(data, prediction, library_config):
     
     #Next identify the Output/Input as Stress/Strain and organise into returned variables
     input_type = library_config['input_type']
-    if input_type not in ('Strain', 'Stress'):
-        print('Improper description of input choice. Defaulting to \'Strain\'')
-        input_type = 'Strain'
+#     if input_type not in ('Strain', 'Stress'):
+#         print('Improper description of input choice. Defaulting to \'Strain\'')
+#         input_type = 'Strain'
     
     if input_type == 'Strain':
         strain = input_theta
         stress = output_theta
-    else:
+    elif input_type == 'Stress':
         strain = output_theta
         stress = input_theta
-    
+    else:
+        print('Improper description of input choice. Was: '+input_type+'. Should be either \'Strain\' or \'Stress\'')
+        
     strain_t = strain[:, 1:2] # Extract the first time derivative of strain
     strain = torch.cat((strain[:, 0:1], strain[:, 2:]), dim=1) # remove this before it gets put into theta
     strain *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
