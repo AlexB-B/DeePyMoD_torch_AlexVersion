@@ -44,8 +44,6 @@ def mech_library(data, prediction, library_config):
     
     '''
     
-    max_order = library_config['diff_order']
-    
     #Begin by computing the values of the terms corresponding to the input, for which an analytical expression is given. This only needs to be done for the very first epoch, after which the values are known and stored in the library_config dictionary.
     if ('input_theta' in library_config) and (library_config['input_theta'].shape[0] == data.shape[0]):
         input_theta = library_config['input_theta']
@@ -105,8 +103,6 @@ def mech_library_real(data, prediction, library_config):
 
 def strain_input_library(data, prediction, library_config):    
     
-    max_order = library_config['diff_order']
-    
     #Begin by computing the values of the terms corresponding to the input, for which an analytical expression is given. This only needs to be done for the very first epoch, after which the values are known and stored in the library_config dictionary.
     if ('input_theta' in library_config) and (library_config['input_theta'].shape[0] == data.shape[0]):
         input_theta = library_config['input_theta']
@@ -130,8 +126,6 @@ def strain_input_library(data, prediction, library_config):
 
 
 def stress_input_library(data, prediction, library_config):    
-    
-    max_order = library_config['diff_order']
     
     #Begin by computing the values of the terms corresponding to the input, for which an analytical expression is given. This only needs to be done for the very first epoch, after which the values are known and stored in the library_config dictionary.
     if ('input_theta' in library_config) and (library_config['input_theta'].shape[0] == data.shape[0]):
