@@ -55,7 +55,7 @@ def DeepMoD(data, target, network_config, library_config, optim_config, plot_int
     # Initial training to just minimise MSE. coeff_vector_list only necessary for housekeeping.
     if 'mse_only_iterations' in optim_config:
         print('Training MSE only')
-        train_mse(data, target, network, coeff_vector_list, optim_config_internal, plot=plot)
+        train_mse(data, target, network, coeff_vector_list, optim_config_internal, plot_interval=plot_interval)
     
     if optim_config.get('do_lstsq_approx', False):
         # Make initial guess at coeffs
