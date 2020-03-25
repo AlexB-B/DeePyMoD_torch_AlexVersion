@@ -4,7 +4,7 @@ from deepymod_torch.sparsity import scaling, threshold
 import numpy as np
 import torch
 
-def DeepMoD(data, target, network_config, library_config, optim_config, plot=False, NN=False):
+def DeepMoD(data, target, network_config, library_config, optim_config, plot_interval=False, NN=False):
     '''
     Runs the deepmod algorithm on the supplied dataset. Mostly a convenience function and can be used as
     a basis for more complex training means. First column of data must correspond to time coordinates, spatial coordinates
@@ -78,7 +78,7 @@ def DeepMoD(data, target, network_config, library_config, optim_config, plot=Fal
             print('Running full training')
         
         # Training of the network
-        time_deriv_list, sparse_theta_list, coeff_vector_list = train(data, target, network, coeff_vector_list, sparsity_mask_list, library_config, optim_config_internal, plot=plot)
+        time_deriv_list, sparse_theta_list, coeff_vector_list = train(data, target, network, coeff_vector_list, sparsity_mask_list, library_config, optim_config_internal, plot_interval=plot_interval)
         
         # Thresholding
         scaled_coeff_vector_list = [scaling(coeff_vector, theta, time_deriv) for coeff_vector, theta, time_deriv in zip(coeff_vector_list, sparse_theta_list, time_deriv_list)]
