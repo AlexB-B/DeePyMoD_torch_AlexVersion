@@ -1,6 +1,0 @@
-E: [1, 1, 1]
-eta: [2.5, 0.5]
-Input: Stress
-Desc: Sinc
-omega: 1.0134169850289654
-Amp: 7

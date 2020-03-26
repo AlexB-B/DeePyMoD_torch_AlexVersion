@@ -1,3 +1,0 @@
-optim: {'lambda': 1e-06, 'lr_coeffs': 0.002, 'max_iterations': 2, 'mse_only_iterations': 2, 'final_run_iterations': 2}
-network: {'input_dim': 1, 'hidden_dim': 30, 'layers': 4, 'output_dim': 1}
-library: {'type': <function mech_library at 0x7fe256518620>, 'diff_order': 3, 'coeff_sign': 'positive', 'input_type': 'Stress', 'input_expr': <function <lambda> at 0x7fe2565287b8>}
