@@ -63,7 +63,7 @@ def deepmod_init(network_config, library_config):
     return torch_network, coeff_vector_list, sparsity_mask_list
 
 
-def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_config, optim_config, plot_interval=False):
+def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_config, optim_config, print_interval=1000, plot=False):
     '''
     Trains the deepmod neural network and its coefficient vectors until maximum amount of iterations. Writes diagnostics to
     runs/ directory which can be analyzed with tensorboard.
@@ -107,7 +107,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     writer = SummaryWriter()
     writer.add_custom_scalars(custom_board(target, coeff_vector_list))
     
-    if plot_interval: # only works for ODEs (one independant variable)
+    if plot: # only works for ODEs (one independant variable)
         axes1, axes2 = prep_plot(data, target)
 
     start_time = time.time()
@@ -157,9 +157,11 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
                     writer.add_scalar('scaled_coeff ' + str(idx) + ' ' + str(element_idx), element, iteration)
 
         # Printing
-        if plot_interval and (iteration % plot_interval == 0):
+        if iteration % print_interval == 0:
             display.clear_output(wait=True)
-            update_plot(axes1, axes2, data, prediction)
+            
+            if plot:
+                update_plot(axes1, axes2, data, prediction)
             
             print('Epoch | Total loss | MSE | PI | L1 ')
             print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item())
@@ -179,7 +181,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     return time_deriv_list, sparse_theta_list, coeff_vector_list
 
 
-def train_mse(data, target, network, coeff_vector_list, optim_config, plot_interval=False):
+def train_mse(data, target, network, coeff_vector_list, optim_config, print_interval=1000, plot=False):
     '''
     Trains the deepmod neural network and its coefficient vectors until maximum amount of iterations. Writes diagnostics to
     runs/ directory which can be analyzed with tensorboard.
@@ -204,7 +206,7 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, plot_inter
     writer = SummaryWriter()
     writer.add_custom_scalars(custom_board(target, coeff_vector_list))
     
-    if plot_interval:
+    if plot:
         axes1, axes2 = prep_plot(data, target)
     
     start_time = time.time()
@@ -229,9 +231,11 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, plot_inter
                 writer.add_scalar('MSE '+str(idx), MSE_cost_list[idx], iteration)
                 #writer.add_scalar('L1 '+str(idx), l1_cost_list[idx], iteration)
 
-        if plot_interval and (iteration % plot_interval == 0):
+        if iteration % print_interval == 0:
             display.clear_output(wait=True)
-            update_plot(axes1, axes2, data, prediction)
+            
+            if plot:
+                update_plot(axes1, axes2, data, prediction)
             
             print('Epoch | MSE loss ')
             print(iteration, "%.1E" % loss.item())
