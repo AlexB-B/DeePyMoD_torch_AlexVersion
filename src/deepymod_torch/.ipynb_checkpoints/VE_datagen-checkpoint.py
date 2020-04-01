@@ -127,15 +127,21 @@ def calculate_stress_finite_difference(time_array, input_expr, E_mods, viscs):
 def calculate_stress_diff_equation(time_array, strain_array, stress_array, coeff_vector, sparsity_mask, library_diff_order):
     # strain is input and must be known. strain response calculated directly from differential equation using finite difference method.
     
+    # MAKE SENSE OF MASKS
+    # Create boolean arrays to slice mask into strain and stress parts
     first_stress_mask_value = library_diff_order
     is_strain = sparsity_mask < first_stress_mask_value
     is_stress = sparsity_mask >= first_stress_mask_value
     
+    # Slice mask and coeff values and shift stress mask so that mask values always refer to diff order.
     strain_mask = sparsity_mask[is_strain]
     strain_coeffs = list(coeff_vector[is_strain])
     stress_mask = list(sparsity_mask[is_stress] - first_stress_mask_value)
     stress_coeffs = list(coeff_vector[is_stress])
     
+    # Adjust strain mask and coeffs to account for missing first strain derivative.
+    # Mask values above 0 are shifted up and a mask value of 1 added so that mask values always refer to diff order.
+    # A coeff of 1 is added for the coeff of the first strain derivative.
     strain_mask_temp = [strain_mask_item + 1 for strain_mask_item in strain_mask if strain_mask_item > 0]
     if 0 in strain_mask:
         strain_mask = [0, 1] + strain_mask_temp
@@ -144,38 +150,59 @@ def calculate_stress_diff_equation(time_array, strain_array, stress_array, coeff
         strain_mask = [1] + strain_mask_temp
         strain_coeffs = [1] + strain_coeffs
     
+    # GENERATE FINITE DIFFERENCE EXPRESSIONS FOR STRAIN AND STRESS
+    # Avoid dealing with higher order derivatives that were eliminated for both stress and strain.
     max_remaining_diff_order = max(strain_mask+stress_mask)
     
+    # Recover strain symbols and time step symbol
     eps_syms, delta = generate_finite_difference_approx_deriv('epsilon', max_remaining_diff_order)[1:]
+    # Build strain expression by generating finite difference approximation and combining with coeffs.
     strain_expr = sym.S(0)
     for coeff_index, mask_value in enumerate(strain_mask):
         term_approx_expr = generate_finite_difference_approx_deriv('epsilon', mask_value)[0]
         strain_expr += strain_coeffs[coeff_index]*term_approx_expr
     
+    # Recover stress symbols
     sig_syms = generate_finite_difference_approx_deriv('sigma', max_remaining_diff_order)[1]
+    # Build stress expression by generating finite difference approximation and combining with coeffs.
     stress_expr = sym.S(0)
     for coeff_index, mask_value in enumerate(stress_mask):
         term_approx_expr = generate_finite_difference_approx_deriv('sigma', mask_value)[0]
         stress_expr += stress_coeffs[coeff_index]*term_approx_expr
     
+    # DETERMINE EXPRESSION TO RETURN STRESS
+    # Subsitute time step symbol for value. This also simplifies expressions to sums of coeff*unique_symbol terms.
     delta_t = time_array[1] - time_array[0]
     strain_expr = strain_expr.subs(delta, delta_t)
     stress_expr = stress_expr.subs(delta, delta_t)
-
+    
+    # Rearrange expressions to create equation for stress.
+    # The coeff of the zeroth order of any symbol is the coeff a constant wrt to that symbol.
+    # The below line thus produces an expression of everything in stress_expr but coeff*stress(t).
     LHS_to_subtract = stress_expr.coeff(sig_syms[0], 0)
     RHS = strain_expr - LHS_to_subtract
-    stress_coeff = stress_expr.coeff(sig_syms[0])
+    stress_coeff = stress_expr.coeff(sig_syms[0]) # no order means 1st order, ie only coeff of stress(t).
     evaluate_stress = RHS/stress_coeff
     
+    # EVALUATE STRESS FOR ALL TIME POINTS
+    # Evaluation requires the use of some initial values for stress and strain.
+    # The higher the order of derivative, the more 'initial values' needed.
+    # Strain is the controlled variable and so we pick from the full array, but in stress we build off only initial values.
     initial_index = max_remaining_diff_order
     flat_strain_array = strain_array.flatten()
     calculated_stress_array = stress_array[:initial_index].flatten()
     
+    # Evaluate for each time point beyond initial values.
     for t_index in range(initial_index, len(time_array)):
+        # Dictionaries created mapping symbol to stress and strain values at correct historic time point.
+        # Reverse order slicing of symbols to match values correctly.
+        # Always chooses the most recent stress and strain values wrt current time point.
+        # Avoids including stress(t) symbol.
         strain_subs_dict = dict(zip(eps_syms[::-1], flat_strain_array[t_index-initial_index:t_index+1]))
         stress_subs_dict = dict(zip(sig_syms[:0:-1], calculated_stress_array[-initial_index:]))
-        subs_dict = {**strain_subs_dict, **stress_subs_dict}
-
+        subs_dict = {**strain_subs_dict, **stress_subs_dict} # combine dictionaries
+        
+        # Evaluate expression using dictionary as guide for all substitutions. Append to stress so far calculated.
         calculated_stress_array = np.append(calculated_stress_array, evaluate_stress.evalf(subs=subs_dict))
     
     calculated_stress_array = calculated_stress_array.reshape(time_array.shape)
@@ -185,17 +212,24 @@ def calculate_stress_diff_equation(time_array, strain_array, stress_array, coeff
     
 def generate_finite_difference_approx_deriv(sym_string, diff_order):
     
+    # Each symbol refers to the dependant variable at previous steps through independant variable values.
+    # Starts from the current variable value and goes backwards.
     syms = [sym.symbols(sym_string+'_{t-'+str(steps)+'}', real=True) for steps in range(diff_order+1)]
+    # Symbol represents the step change in independant variable.
     delta = sym.symbols('Delta', real=True, positive=True)
     
-    x = sym.symbols('x')
+    # Correct coeff for each symbol for historic value of dependant variable can be determined by analogy.
+    # The coeffs of x following expansion yield the desired coeffs, with polynomial order and number of steps back exchanged. 
+    x = sym.symbols('x') # Dummy variable
     signed_pascal_expression = (1-x)**diff_order
     signed_pascal_expression = signed_pascal_expression.expand()
     
+    # Numerator of expression for finite approx.
     expr = sym.S(0)
     for poly_order in range(diff_order+1):
         expr += signed_pascal_expression.coeff(x, poly_order)*syms[poly_order]
-        
+    
+    # Divide numerator by denominator of expression for finite approx.
     expr /= delta**diff_order
     
     return expr, syms, delta
