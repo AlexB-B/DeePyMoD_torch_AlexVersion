@@ -76,7 +76,7 @@ def relax_creep(E_mods, viscs, input_type):
 
 
 def calculate_strain_finite_difference(time_array, input_expr, E_mods, viscs):
-    # input is stress
+    # input is stress, model is GKM
     
     E_mods_1plus_array = np.array(E_mods[1:]).reshape(-1,1)
     viscs_array = np.array(viscs).reshape(-1,1)
@@ -93,14 +93,14 @@ def calculate_strain_finite_difference(time_array, input_expr, E_mods, viscs):
         # Now strain_i[:, -1] refers to strain_i(t)
         strain = np.append(strain, stress[-1]/E_mods[0] + np.sum(strain_i[:, -1]))
     
-    stress = stress.reshape(-1,1)
-    strain = strain.reshape(-1,1)
+    stress = stress.reshape(time_array.shape)
+    strain = strain.reshape(time_array.shape)
     
     return strain, stress
 
 
 def calculate_stress_finite_difference(time_array, input_expr, E_mods, viscs):
-    # input is strain
+    # input is strain, model is GMM
     
     E_mods_1plus_array = np.array(E_mods[1:]).reshape(-1,1)
     viscs_array = np.array(viscs).reshape(-1,1)
@@ -118,10 +118,110 @@ def calculate_stress_finite_difference(time_array, input_expr, E_mods, viscs):
         # Now stress_i[:, -1] refers to stress_i(t)
         stress = np.append(stress, strain[-1]*E_mods[0] + np.sum(stress_i[:, -1]))
     
-    stress = stress.reshape(-1,1)
-    strain = strain[1:].reshape(-1,1)
+    stress = stress.reshape(time_array.shape)
+    strain = strain[1:].reshape(time_array.shape)
     
     return strain, stress
+
+
+def calculate_stress_diff_equation(time_array, strain_array, stress_array, coeff_vector, sparsity_mask, library_diff_order):
+    # strain is input and must be known. strain response calculated directly from differential equation using finite difference method.
+    
+    first_stress_mask_value = library_diff_order
+    is_strain = sparsity_mask < first_stress_mask_value
+    is_stress = sparsity_mask >= first_stress_mask_value
+    
+    strain_mask = sparsity_mask[is_strain]
+    strain_coeffs = list(coeff_vector[is_strain])
+    stress_mask = list(sparsity_mask[is_stress] - first_stress_mask_value)
+    stress_coeffs = list(coeff_vector[is_stress])
+    
+    strain_mask_temp = [strain_mask_item + 1 for strain_mask_item in strain_mask if strain_mask_item > 0]
+    if 0 in strain_mask:
+        strain_mask = [0, 1] + strain_mask_temp
+        strain_coeffs = [strain_coeffs[0]] + [1] + strain_coeffs[1:]
+    else:
+        strain_mask = [1] + strain_mask_temp
+        strain_coeffs = [1] + strain_coeffs
+    
+    eps_syms, delta = generate_finite_difference_approx_deriv('epsilon', library_diff_order)[1:]
+    # to improve above line could compare max value in strainmask and stress mask and use that instead of library diff order, just to reduce the amount of history that has to be used from prediction.... At the moment it is controlled by the size of the library used, rather than the max order of deriv actually found by deepmod.
+    strain_expr = sym.S(0)
+    for coeff_index, mask_value in enumerate(strain_mask):
+        term_approx_expr = generate_finite_difference_approx_deriv('epsilon', mask_value)[0]
+        strain_expr += strain_coeffs[coeff_index]*term_approx_expr
+    
+    sig_syms = generate_finite_difference_approx_deriv('sigma', library_diff_order)[1]
+    stress_expr = sym.S(0)
+    for coeff_index, mask_value in enumerate(stress_mask):
+        term_approx_expr = generate_finite_difference_approx_deriv('sigma', mask_value)[0]
+        stress_expr += stress_coeffs[coeff_index]*term_approx_expr
+    
+    delta_t = time_array[1] - time_array[0]
+    strain_expr = strain_expr.subs(delta, delta_t)
+    stress_expr = stress_expr.subs(delta, delta_t)
+    
+    # LHS always contains term for stress(t)
+#     LHS = stress_expr.together()
+#     RHS = strain_expr.together()
+#     LHS, LHS_denom = sym.fraction(LHS)
+#     RHS, RHS_denom = sym.fraction(RHS)
+#     LHS *= RHS_denom
+#     RHS *= LHS_denom
+#     LHS = LHS.expand()
+#     RHS = RHS.expand()
+#     stress_coeff = LHS.coeff(sig_syms[0], 0)
+#     LHS_to_subtract = LHS - stress_coeff*sig_syms[0]
+#     RHS -= LHS_to_subtract
+
+    LHS_to_subtract = stress_expr.coeff(sig_syms[0], 0)
+    RHS = strain_expr - LHS_to_subtract
+    stress_coeff = stress_expr.coeff(sig_syms[0])
+    evaluate_stress = RHS/stress_coeff
+    
+    initial_index = library_diff_order
+#     calculated_stress_array = stress_array[:initial_index].copy()
+    flat_strain_array = strain_array.flatten()
+    calculated_stress_array = stress_array[:initial_index].flatten()
+    
+    for t_index in range(initial_index, len(time_array)):
+#         evaluate_stress_t = evaluate_stress # immutable so no need for .copy()
+#         evaluate_stress_t = evaluate_stress.subs(zip(eps_syms[::-1], strain_array[t_index-initial_index:t_index+1]))
+#         evaluate_stress_t = evaluate_stress_t.subs(zip(sig_syms[1::-1], calculated_stress_array[t_index-initial_index:t_index]))
+        
+        strain_subs_dict = dict(zip(eps_syms[::-1], flat_strain_array[t_index-initial_index:t_index+1]))
+        stress_subs_dict = dict(zip(sig_syms[:0:-1], calculated_stress_array[-initial_index:]))
+        subs_dict = {**strain_subs_dict, **stress_subs_dict}
+#         for hist_sym_ref in range(len(eps_syms)):
+#             evaluate_stress_t = evaluate_stress_t.subs(eps_syms[hist_sym_ref], strain_array[t_index - hist_sym_ref])
+#             # Below may throw up an error because calculated stress array is always one shorter than t_index - 0 tries to access.
+#             # I hope because sig_syms[0] is not in evaluate_stress, it will bypass this automatically...
+#             evaluate_stress_t = evaluate_stress_t.subs(sig_syms[hist_sym_ref], calculated_stress_array[t_index - hist_sym_ref])
+
+        calculated_stress_array = np.append(calculated_stress_array, evaluate_stress.evalf(subs=subs_dict))#, axis=1)
+#         calculated_stress_list.append(evaluate_stress.evalf(subs=subs_dict))
+    
+    calculated_stress_array = calculated_stress_array.reshape(time_array.shape)
+    
+    return calculated_stress_array
+    
+    
+def generate_finite_difference_approx_deriv(sym_string, diff_order):
+    
+    syms = [sym.symbols(sym_string+'_{t-'+str(steps)+'}', real=True) for steps in range(diff_order+1)]
+    delta = sym.symbols('Delta', real=True, positive=True)
+    
+    x = sym.symbols('x')
+    signed_pascal_expression = (1-x)**diff_order
+    signed_pascal_expression = signed_pascal_expression.expand()
+    
+    expr = sym.S(0)
+    for poly_order in range(diff_order+1):
+        expr += signed_pascal_expression.coeff(x, poly_order)*syms[poly_order]
+        
+    expr /= delta**diff_order
+    
+    return expr, syms, delta
 
 
 def wave_packet_lambdas_sum(freq_max, freq_step, std_dev):
