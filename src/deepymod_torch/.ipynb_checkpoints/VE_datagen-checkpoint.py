@@ -2,6 +2,7 @@ import numpy as np
 import scipy.integrate as integ
 import sympy as sym
 import torch
+import torch.autograd as auto
 
 import deepymod_torch.VE_params as VE_params
 
@@ -124,31 +125,113 @@ def calculate_stress_finite_difference(time_array, input_expr, E_mods, viscs):
     return strain, stress
 
 
-def calculate_stress_diff_equation(time_array, strain_array, stress_array, coeff_vector, sparsity_mask, library_diff_order):
-    # strain is input and must be known. strain response calculated directly from differential equation using finite difference method.
+def calculate_int_diff_equation(time_tensor, prediction_tensor, input_lambda, coeff_vector, sparsity_mask, library_diff_order, input_type):
+    
+    coeff_array = np.array(coeff_vector.detach())
+    mask_array = np.array(sparsity_mask)
+    
+    strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeff_array, mask_array, library_diff_order)
+    
+    if input_type == 'Strain':
+        input_coeffs, input_mask = strain_coeffs_mask
+        response_coeffs, response_mask = stress_coeffs_mask
+    else:
+        response_coeffs, response_mask = strain_coeffs_mask
+        input_coeffs, input_mask = stress_coeffs_mask
+    
+    neg_response_coeffs = -response_coeffs[:-1]
+    coeffs_less_dadt_array = np.concatenate((input_coeffs, neg_response_coeffs))
+    
+    max_input_diff_order = max(input_mask)
+    max_response_diff_order = max(response_mask)
+    
+    num_girth = 1
+    num_half_depth = 50
+    num_depth = 2*num_half_depth + 1
+    def calc_dU_dt(U, t):
+        # U is list (seems to be converted to array before injection) of stress and increasing orders of derivative of stress.
+        # Returns list of derivative of each input element in U.
+        
+        t_temp = np.linspace(t-num_girth, t+num_girth, num_depth)
+        input_array = input_lambda(t_temp)
+        
+        input_derivs = num_derivs(input_array, t_temp, max_input_diff_order)[num_half_depth, :]
+        
+        input_terms = np.array([input_derivs[mask_value] for mask_value in input_mask])
+        response_terms = np.array([U[mask_value] for mask_value in response_mask[:-1]])
+        terms_array = np.concatenate((input_terms, response_terms))
+        
+        da_dt = np.sum(coeffs_less_dadt_array*terms_array)/response_coeffs[-1]
+        
+        dU_dt = list(U[1:]) + [da_dt]
+        
+        return dU_dt
+    
+    time_array = np.array(time_tensor.detach()).flatten()
+    IVs = [prediction_tensor[0]]
+    for _ in range(max_response_diff_order-1):
+        IVs += [auto.grad(IVs[-1], time_tensor, create_graph=True)[0][0]]
+    
+    IVs = [IV.item() for IV in IVs]
+    calculated_response_array = integ.odeint(calc_dU_dt, IVs, time_array)[:, 0:1]
+    
+    return calculated_response_array
+
+
+# def calculate_stress_int_diff_equation(time_tensor, stress_tensor, strain_lambda, coeff_vector, sparsity_mask, library_diff_order):
+    
+#     coeff_array = np.array(coeff_vector.detach())
+#     mask_array = np.array(sparsity_mask)
+    
+#     strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeff_array, mask_array, library_diff_order)
+#     strain_coeffs, strain_mask = strain_coeffs_mask
+#     stress_coeffs, stress_mask = stress_coeffs_mask
+    
+#     neg_stress_coeffs = -stress_coeffs[:-1]
+#     coeffs_less_dadt_array = np.concatenate((strain_coeffs, neg_stress_coeffs))
+    
+#     max_strain_diff_order = max(strain_mask)
+    
+#     num_girth = 1
+#     num_half_depth = 50
+#     num_depth = 2*num_half_depth + 1
+#     def calc_dU_dt(U, t):
+#         # U is list (seems to be converted to array before injection) of stress and increasing orders of derivative of stress.
+#         # Returns list of derivative of each input element in U.
+        
+#         t_temp = np.linspace(t-num_girth, t+num_girth, num_depth)
+#         strain_array = strain_lambda(t_temp)
+        
+#         strain_derivs = num_derivs(strain_array, t_temp, max_strain_diff_order)[num_half_depth, :]
+        
+#         strain_terms = np.array([strain_derivs[mask_value] for mask_value in strain_mask])
+#         stress_terms = np.array([U[mask_value] for mask_value in stress_mask[:-1]])
+#         terms_array = np.concatenate((strain_terms, stress_terms))
+        
+#         da_dt = np.sum(coeffs_less_dadt_array*terms_array)/stress_coeffs[-1]
+        
+#         dU_dt = list(U[1:]) + [da_dt]
+        
+#         return dU_dt
+    
+#     time_array = np.array(time_tensor.detach()).flatten()
+#     IVs = [stress_tensor[0]]
+#     max_stress_diff_order = max(stress_mask)
+#     for _ in range(max_stress_diff_order-1):
+#         IVs += [grad(IVs[-1], time_tensor, create_graph=True)[0][0]]
+    
+#     IVs = [IV.item() for IV in IVs]
+#     calculated_stress_array = integ.odeint(calc_dU_dt, IVs, time_array)[:, 0]
+    
+#     return calculated_stress_array
+
+
+def calculate_finite_difference_diff_equation(time_array, strain_array, stress_array, coeff_vector, sparsity_mask, library_diff_order, input_type):
     
     # MAKE SENSE OF MASKS
-    # Create boolean arrays to slice mask into strain and stress parts
-    first_stress_mask_value = library_diff_order
-    is_strain = sparsity_mask < first_stress_mask_value
-    is_stress = sparsity_mask >= first_stress_mask_value
-    
-    # Slice mask and coeff values and shift stress mask so that mask values always refer to diff order.
-    strain_mask = sparsity_mask[is_strain]
-    strain_coeffs = list(coeff_vector[is_strain])
-    stress_mask = list(sparsity_mask[is_stress] - first_stress_mask_value)
-    stress_coeffs = list(coeff_vector[is_stress])
-    
-    # Adjust strain mask and coeffs to account for missing first strain derivative.
-    # Mask values above 0 are shifted up and a mask value of 1 added so that mask values always refer to diff order.
-    # A coeff of 1 is added for the coeff of the first strain derivative.
-    strain_mask_temp = [strain_mask_item + 1 for strain_mask_item in strain_mask if strain_mask_item > 0]
-    if 0 in strain_mask:
-        strain_mask = [0, 1] + strain_mask_temp
-        strain_coeffs = [strain_coeffs[0]] + [1] + strain_coeffs[1:]
-    else:
-        strain_mask = [1] + strain_mask_temp
-        strain_coeffs = [1] + strain_coeffs
+    strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order)
+    strain_coeffs, strain_mask = list(strain_coeffs_mask[0]), list(strain_coeffs_mask[1])
+    stress_coeffs, stress_mask = list(stress_coeffs_mask[0]), list(stress_coeffs_mask[1])
     
     # GENERATE FINITE DIFFERENCE EXPRESSIONS FOR STRAIN AND STRESS
     # Avoid dealing with higher order derivatives that were eliminated for both stress and strain.
@@ -170,44 +253,128 @@ def calculate_stress_diff_equation(time_array, strain_array, stress_array, coeff
         term_approx_expr = generate_finite_difference_approx_deriv('sigma', mask_value)[0]
         stress_expr += stress_coeffs[coeff_index]*term_approx_expr
     
-    # DETERMINE EXPRESSION TO RETURN STRESS
+    # DETERMINE EXPRESSION TO RETURN RESPONSE
     # Subsitute time step symbol for value. This also simplifies expressions to sums of coeff*unique_symbol terms.
     delta_t = time_array[1] - time_array[0]
     strain_expr = strain_expr.subs(delta, delta_t)
     stress_expr = stress_expr.subs(delta, delta_t)
     
-    # Rearrange expressions to create equation for stress.
+    if input_type == 'Strain':
+        input_array = strain_array
+        response_array = stress_array
+        input_expr = strain_expr
+        response_expr = stress_expr
+        input_syms = eps_syms
+        response_syms = sig_syms
+    else:
+        input_array = stress_array
+        response_array = strain_array
+        input_expr = stress_expr
+        response_expr = strain_expr
+        input_syms = sig_syms
+        response_syms = eps_syms
+    
+    # Rearrange expressions to create equation for response.
     # The coeff of the zeroth order of any symbol is the coeff a constant wrt to that symbol.
     # The below line thus produces an expression of everything in stress_expr but coeff*stress(t).
-    LHS_to_subtract = stress_expr.coeff(sig_syms[0], 0)
-    RHS = strain_expr - LHS_to_subtract
-    stress_coeff = stress_expr.coeff(sig_syms[0]) # no order means 1st order, ie only coeff of stress(t).
-    evaluate_stress = RHS/stress_coeff
+    response_side_to_subtract = response_expr.coeff(response_syms[0], 0)
+    input_side = input_expr - response_side_to_subtract
+    response_coeff = response_expr.coeff(response_syms[0]) # no order means 1st order, ie only coeff of stress(t).
+    evaluate_response = input_side/response_coeff
     
-    # EVALUATE STRESS FOR ALL TIME POINTS
+    # EVALUATE RESPONSE FOR ALL TIME POINTS
     # Evaluation requires the use of some initial values for stress and strain.
     # The higher the order of derivative, the more 'initial values' needed.
-    # Strain is the controlled variable and so we pick from the full array, but in stress we build off only initial values.
+    # We pick from the full array of the controlled variable, but response builds off only initial values.
     initial_index = max_remaining_diff_order
-    flat_strain_array = strain_array.flatten()
-    calculated_stress_array = stress_array[:initial_index].flatten()
+    flat_input_array = input_array.flatten()
+    calculated_response_array = response_array[:initial_index].flatten()
     
     # Evaluate for each time point beyond initial values.
     for t_index in range(initial_index, len(time_array)):
         # Dictionaries created mapping symbol to stress and strain values at correct historic time point.
         # Reverse order slicing of symbols to match values correctly.
         # Always chooses the most recent stress and strain values wrt current time point.
-        # Avoids including stress(t) symbol.
-        strain_subs_dict = dict(zip(eps_syms[::-1], flat_strain_array[t_index-initial_index:t_index+1]))
-        stress_subs_dict = dict(zip(sig_syms[:0:-1], calculated_stress_array[-initial_index:]))
-        subs_dict = {**strain_subs_dict, **stress_subs_dict} # combine dictionaries
+        # Avoids including response(t) symbol.
+        input_subs_dict = dict(zip(input_syms[::-1], flat_input_array[t_index-initial_index:t_index+1]))
+        response_subs_dict = dict(zip(response_syms[:0:-1], calculated_response_array[-initial_index:]))
+        subs_dict = {**input_subs_dict, **response_subs_dict} # combine dictionaries
         
         # Evaluate expression using dictionary as guide for all substitutions. Append to stress so far calculated.
-        calculated_stress_array = np.append(calculated_stress_array, evaluate_stress.evalf(subs=subs_dict))
+        calculated_response_array = np.append(calculated_response_array, evaluate_response.evalf(subs=subs_dict))
     
-    calculated_stress_array = calculated_stress_array.reshape(time_array.shape)
+    calculated_response_array = calculated_response_array.reshape(time_array.shape)
     
-    return calculated_stress_array
+    # returned array is the opposite quantity to the input as specified by input type.
+    return calculated_response_array
+
+
+# def calculate_stress_finite_difference_diff_equation(time_array, strain_array, stress_array, coeff_vector, sparsity_mask, library_diff_order):
+#     # strain is input and must be known. strain response calculated directly from differential equation using finite difference method.
+    
+#     # MAKE SENSE OF MASKS
+#     strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order)
+#     strain_coeffs, strain_mask = list(strain_coeffs_mask[0]), list(strain_coeffs_mask[1])
+#     stress_coeffs, stress_mask = list(stress_coeffs_mask[0]), list(stress_coeffs_mask[1])
+    
+#     # GENERATE FINITE DIFFERENCE EXPRESSIONS FOR STRAIN AND STRESS
+#     # Avoid dealing with higher order derivatives that were eliminated for both stress and strain.
+#     max_remaining_diff_order = max(strain_mask+stress_mask)
+    
+#     # Recover strain symbols and time step symbol
+#     eps_syms, delta = generate_finite_difference_approx_deriv('epsilon', max_remaining_diff_order)[1:]
+#     # Build strain expression by generating finite difference approximation and combining with coeffs.
+#     strain_expr = sym.S(0)
+#     for coeff_index, mask_value in enumerate(strain_mask):
+#         term_approx_expr = generate_finite_difference_approx_deriv('epsilon', mask_value)[0]
+#         strain_expr += strain_coeffs[coeff_index]*term_approx_expr
+    
+#     # Recover stress symbols
+#     sig_syms = generate_finite_difference_approx_deriv('sigma', max_remaining_diff_order)[1]
+#     # Build stress expression by generating finite difference approximation and combining with coeffs.
+#     stress_expr = sym.S(0)
+#     for coeff_index, mask_value in enumerate(stress_mask):
+#         term_approx_expr = generate_finite_difference_approx_deriv('sigma', mask_value)[0]
+#         stress_expr += stress_coeffs[coeff_index]*term_approx_expr
+    
+#     # DETERMINE EXPRESSION TO RETURN STRESS
+#     # Subsitute time step symbol for value. This also simplifies expressions to sums of coeff*unique_symbol terms.
+#     delta_t = time_array[1] - time_array[0]
+#     strain_expr = strain_expr.subs(delta, delta_t)
+#     stress_expr = stress_expr.subs(delta, delta_t)
+    
+#     # Rearrange expressions to create equation for stress.
+#     # The coeff of the zeroth order of any symbol is the coeff a constant wrt to that symbol.
+#     # The below line thus produces an expression of everything in stress_expr but coeff*stress(t).
+#     LHS_to_subtract = stress_expr.coeff(sig_syms[0], 0)
+#     RHS = strain_expr - LHS_to_subtract
+#     stress_coeff = stress_expr.coeff(sig_syms[0]) # no order means 1st order, ie only coeff of stress(t).
+#     evaluate_stress = RHS/stress_coeff
+    
+#     # EVALUATE STRESS FOR ALL TIME POINTS
+#     # Evaluation requires the use of some initial values for stress and strain.
+#     # The higher the order of derivative, the more 'initial values' needed.
+#     # Strain is the controlled variable and so we pick from the full array, but in stress we build off only initial values.
+#     initial_index = max_remaining_diff_order
+#     flat_strain_array = strain_array.flatten()
+#     calculated_stress_array = stress_array[:initial_index].flatten()
+    
+#     # Evaluate for each time point beyond initial values.
+#     for t_index in range(initial_index, len(time_array)):
+#         # Dictionaries created mapping symbol to stress and strain values at correct historic time point.
+#         # Reverse order slicing of symbols to match values correctly.
+#         # Always chooses the most recent stress and strain values wrt current time point.
+#         # Avoids including stress(t) symbol.
+#         strain_subs_dict = dict(zip(eps_syms[::-1], flat_strain_array[t_index-initial_index:t_index+1]))
+#         stress_subs_dict = dict(zip(sig_syms[:0:-1], calculated_stress_array[-initial_index:]))
+#         subs_dict = {**strain_subs_dict, **stress_subs_dict} # combine dictionaries
+        
+#         # Evaluate expression using dictionary as guide for all substitutions. Append to stress so far calculated.
+#         calculated_stress_array = np.append(calculated_stress_array, evaluate_stress.evalf(subs=subs_dict))
+    
+#     calculated_stress_array = calculated_stress_array.reshape(time_array.shape)
+    
+#     return calculated_stress_array
     
     
 def generate_finite_difference_approx_deriv(sym_string, diff_order):
@@ -233,6 +400,36 @@ def generate_finite_difference_approx_deriv(sym_string, diff_order):
     expr /= delta**diff_order
     
     return expr, syms, delta
+
+
+def align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order):
+    
+    # Create boolean arrays to slice mask into strain and stress parts
+    first_stress_mask_value = library_diff_order
+    is_strain = sparsity_mask < first_stress_mask_value
+    is_stress = sparsity_mask >= first_stress_mask_value
+    
+    # Slice mask and coeff values and shift stress mask so that mask values always refer to diff order.
+    strain_mask = sparsity_mask[is_strain]
+    strain_coeffs = list(coeff_vector[is_strain].flatten())
+    stress_mask = list(sparsity_mask[is_stress] - first_stress_mask_value)
+    stress_coeffs = list(coeff_vector[is_stress].flatten())
+    
+    # Adjust strain mask and coeffs to account for missing first strain derivative.
+    # Mask values above 0 are shifted up and a mask value of 1 added so that mask values always refer to diff order.
+    # A coeff of 1 is added for the coeff of the first strain derivative.
+    strain_mask_temp = [strain_mask_item + 1 for strain_mask_item in strain_mask if strain_mask_item > 0]
+    if 0 in strain_mask:
+        strain_mask = [0, 1] + strain_mask_temp
+        strain_coeffs = [strain_coeffs[0]] + [1] + strain_coeffs[1:]
+    else:
+        strain_mask = [1] + strain_mask_temp
+        strain_coeffs = [1] + strain_coeffs
+    
+    strain_coeffs_mask = np.array(strain_coeffs), np.array(strain_mask)
+    stress_coeffs_mask = np.array(stress_coeffs), np.array(stress_mask)
+    
+    return strain_coeffs_mask, stress_coeffs_mask
 
 
 def wave_packet_lambdas_sum(freq_max, freq_step, std_dev):
