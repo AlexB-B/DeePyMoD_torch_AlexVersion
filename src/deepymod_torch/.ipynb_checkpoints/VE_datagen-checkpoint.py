@@ -130,6 +130,7 @@ def calculate_int_diff_equation(time_tensor, prediction_tensor, input_lambda, co
     coeff_array = np.array(coeff_vector.detach())
     mask_array = np.array(sparsity_mask)
     
+    # Function returns masks and arrays in format such that mask values correspond to diff order etc.
     strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeff_array, mask_array, library_diff_order)
     
     if input_type == 'Strain':
@@ -139,28 +140,41 @@ def calculate_int_diff_equation(time_tensor, prediction_tensor, input_lambda, co
         response_coeffs, response_mask = strain_coeffs_mask
         input_coeffs, input_mask = stress_coeffs_mask
     
+    # Coeffs as stated refer to an equation with all stress terms on one side, and all strain on the other.
+    # Depending on which coeffs are paired with the response, they must be moved across to the other side.
+    # This is accomplished by making them negative, and concatenating carefully to prepare for alignment with correct terms.
+    # The coeff for the highest derivative of response variable is left behind, and moved later.
     neg_response_coeffs = -response_coeffs[:-1]
     coeffs_less_dadt_array = np.concatenate((input_coeffs, neg_response_coeffs))
     
+    # Don't skip derivative orders, but avoids calculating higher derivatives than were eliminated.
     max_input_diff_order = max(input_mask)
     max_response_diff_order = max(response_mask)
     
+    # Parameters designed for spooling out time array around time point of interest with each call of calc_dU_dt
     num_girth = 1
     num_half_depth = 50
     num_depth = 2*num_half_depth + 1
+    
     def calc_dU_dt(U, t):
         # U is list (seems to be converted to array before injection) of stress and increasing orders of derivative of stress.
         # Returns list of derivative of each input element in U.
         
+        # To calculate numerical derivs, spool out time points around point of interest, calculating associated input values...
         t_temp = np.linspace(t-num_girth, t+num_girth, num_depth)
         input_array = input_lambda(t_temp)
         
+        # ... Then calc all num derivs for all spooled time array, but retain only row of interest.
         input_derivs = num_derivs(input_array, t_temp, max_input_diff_order)[num_half_depth, :]
         
+        # Use masks to select manipulation terms from numerical work above...
+        # ...and response terms from function parameter, considering ladder of derivative substitions.
+        # Concatenate carefully to align with coefficient order.
         input_terms = np.array([input_derivs[mask_value] for mask_value in input_mask])
         response_terms = np.array([U[mask_value] for mask_value in response_mask[:-1]])
         terms_array = np.concatenate((input_terms, response_terms))
         
+        # Multiply aligned coeff-term pairs and divide by coeff of highest order deriv of response variable.
         da_dt = np.sum(coeffs_less_dadt_array*terms_array)/response_coeffs[-1]
         
         dU_dt = list(U[1:]) + [da_dt]
@@ -168,11 +182,13 @@ def calculate_int_diff_equation(time_tensor, prediction_tensor, input_lambda, co
         return dU_dt
     
     time_array = np.array(time_tensor.detach()).flatten()
+    # Initial values of response and response derivatives determined using torch autograd.
     IVs = [prediction_tensor[0]]
     for _ in range(max_response_diff_order-1):
         IVs += [auto.grad(IVs[-1], time_tensor, create_graph=True)[0][0]]
     
     IVs = [IV.item() for IV in IVs]
+    
     calculated_response_array = integ.odeint(calc_dU_dt, IVs, time_array)[:, 0:1]
     
     return calculated_response_array
@@ -310,6 +326,7 @@ def align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order):
         strain_mask = [1] + strain_mask_temp
         strain_coeffs = [1] + strain_coeffs
     
+    # Arrays in, arrays out.
     strain_coeffs_mask = np.array(strain_coeffs), np.array(strain_mask)
     stress_coeffs_mask = np.array(stress_coeffs), np.array(stress_mask)
     
