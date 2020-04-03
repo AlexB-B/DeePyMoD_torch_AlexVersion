@@ -178,54 +178,6 @@ def calculate_int_diff_equation(time_tensor, prediction_tensor, input_lambda, co
     return calculated_response_array
 
 
-# def calculate_stress_int_diff_equation(time_tensor, stress_tensor, strain_lambda, coeff_vector, sparsity_mask, library_diff_order):
-    
-#     coeff_array = np.array(coeff_vector.detach())
-#     mask_array = np.array(sparsity_mask)
-    
-#     strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeff_array, mask_array, library_diff_order)
-#     strain_coeffs, strain_mask = strain_coeffs_mask
-#     stress_coeffs, stress_mask = stress_coeffs_mask
-    
-#     neg_stress_coeffs = -stress_coeffs[:-1]
-#     coeffs_less_dadt_array = np.concatenate((strain_coeffs, neg_stress_coeffs))
-    
-#     max_strain_diff_order = max(strain_mask)
-    
-#     num_girth = 1
-#     num_half_depth = 50
-#     num_depth = 2*num_half_depth + 1
-#     def calc_dU_dt(U, t):
-#         # U is list (seems to be converted to array before injection) of stress and increasing orders of derivative of stress.
-#         # Returns list of derivative of each input element in U.
-        
-#         t_temp = np.linspace(t-num_girth, t+num_girth, num_depth)
-#         strain_array = strain_lambda(t_temp)
-        
-#         strain_derivs = num_derivs(strain_array, t_temp, max_strain_diff_order)[num_half_depth, :]
-        
-#         strain_terms = np.array([strain_derivs[mask_value] for mask_value in strain_mask])
-#         stress_terms = np.array([U[mask_value] for mask_value in stress_mask[:-1]])
-#         terms_array = np.concatenate((strain_terms, stress_terms))
-        
-#         da_dt = np.sum(coeffs_less_dadt_array*terms_array)/stress_coeffs[-1]
-        
-#         dU_dt = list(U[1:]) + [da_dt]
-        
-#         return dU_dt
-    
-#     time_array = np.array(time_tensor.detach()).flatten()
-#     IVs = [stress_tensor[0]]
-#     max_stress_diff_order = max(stress_mask)
-#     for _ in range(max_stress_diff_order-1):
-#         IVs += [grad(IVs[-1], time_tensor, create_graph=True)[0][0]]
-    
-#     IVs = [IV.item() for IV in IVs]
-#     calculated_stress_array = integ.odeint(calc_dU_dt, IVs, time_array)[:, 0]
-    
-#     return calculated_stress_array
-
-
 def calculate_finite_difference_diff_equation(time_array, strain_array, stress_array, coeff_vector, sparsity_mask, library_diff_order, input_type):
     
     # MAKE SENSE OF MASKS
@@ -309,74 +261,6 @@ def calculate_finite_difference_diff_equation(time_array, strain_array, stress_a
     return calculated_response_array
 
 
-# def calculate_stress_finite_difference_diff_equation(time_array, strain_array, stress_array, coeff_vector, sparsity_mask, library_diff_order):
-#     # strain is input and must be known. strain response calculated directly from differential equation using finite difference method.
-    
-#     # MAKE SENSE OF MASKS
-#     strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order)
-#     strain_coeffs, strain_mask = list(strain_coeffs_mask[0]), list(strain_coeffs_mask[1])
-#     stress_coeffs, stress_mask = list(stress_coeffs_mask[0]), list(stress_coeffs_mask[1])
-    
-#     # GENERATE FINITE DIFFERENCE EXPRESSIONS FOR STRAIN AND STRESS
-#     # Avoid dealing with higher order derivatives that were eliminated for both stress and strain.
-#     max_remaining_diff_order = max(strain_mask+stress_mask)
-    
-#     # Recover strain symbols and time step symbol
-#     eps_syms, delta = generate_finite_difference_approx_deriv('epsilon', max_remaining_diff_order)[1:]
-#     # Build strain expression by generating finite difference approximation and combining with coeffs.
-#     strain_expr = sym.S(0)
-#     for coeff_index, mask_value in enumerate(strain_mask):
-#         term_approx_expr = generate_finite_difference_approx_deriv('epsilon', mask_value)[0]
-#         strain_expr += strain_coeffs[coeff_index]*term_approx_expr
-    
-#     # Recover stress symbols
-#     sig_syms = generate_finite_difference_approx_deriv('sigma', max_remaining_diff_order)[1]
-#     # Build stress expression by generating finite difference approximation and combining with coeffs.
-#     stress_expr = sym.S(0)
-#     for coeff_index, mask_value in enumerate(stress_mask):
-#         term_approx_expr = generate_finite_difference_approx_deriv('sigma', mask_value)[0]
-#         stress_expr += stress_coeffs[coeff_index]*term_approx_expr
-    
-#     # DETERMINE EXPRESSION TO RETURN STRESS
-#     # Subsitute time step symbol for value. This also simplifies expressions to sums of coeff*unique_symbol terms.
-#     delta_t = time_array[1] - time_array[0]
-#     strain_expr = strain_expr.subs(delta, delta_t)
-#     stress_expr = stress_expr.subs(delta, delta_t)
-    
-#     # Rearrange expressions to create equation for stress.
-#     # The coeff of the zeroth order of any symbol is the coeff a constant wrt to that symbol.
-#     # The below line thus produces an expression of everything in stress_expr but coeff*stress(t).
-#     LHS_to_subtract = stress_expr.coeff(sig_syms[0], 0)
-#     RHS = strain_expr - LHS_to_subtract
-#     stress_coeff = stress_expr.coeff(sig_syms[0]) # no order means 1st order, ie only coeff of stress(t).
-#     evaluate_stress = RHS/stress_coeff
-    
-#     # EVALUATE STRESS FOR ALL TIME POINTS
-#     # Evaluation requires the use of some initial values for stress and strain.
-#     # The higher the order of derivative, the more 'initial values' needed.
-#     # Strain is the controlled variable and so we pick from the full array, but in stress we build off only initial values.
-#     initial_index = max_remaining_diff_order
-#     flat_strain_array = strain_array.flatten()
-#     calculated_stress_array = stress_array[:initial_index].flatten()
-    
-#     # Evaluate for each time point beyond initial values.
-#     for t_index in range(initial_index, len(time_array)):
-#         # Dictionaries created mapping symbol to stress and strain values at correct historic time point.
-#         # Reverse order slicing of symbols to match values correctly.
-#         # Always chooses the most recent stress and strain values wrt current time point.
-#         # Avoids including stress(t) symbol.
-#         strain_subs_dict = dict(zip(eps_syms[::-1], flat_strain_array[t_index-initial_index:t_index+1]))
-#         stress_subs_dict = dict(zip(sig_syms[:0:-1], calculated_stress_array[-initial_index:]))
-#         subs_dict = {**strain_subs_dict, **stress_subs_dict} # combine dictionaries
-        
-#         # Evaluate expression using dictionary as guide for all substitutions. Append to stress so far calculated.
-#         calculated_stress_array = np.append(calculated_stress_array, evaluate_stress.evalf(subs=subs_dict))
-    
-#     calculated_stress_array = calculated_stress_array.reshape(time_array.shape)
-    
-#     return calculated_stress_array
-    
-    
 def generate_finite_difference_approx_deriv(sym_string, diff_order):
     
     # Each symbol refers to the dependant variable at previous steps through independant variable values.
