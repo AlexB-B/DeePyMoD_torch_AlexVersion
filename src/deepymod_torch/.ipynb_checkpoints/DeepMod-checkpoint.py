@@ -56,13 +56,16 @@ def DeepMoD(data, target, network_config, library_config, optim_config, print_in
     if 'mse_only_iterations' in optim_config:
         print('Training MSE only')
         train_mse(data, target, network, coeff_vector_list, optim_config_internal, print_interval=print_interval, plot=plot)
-    
-    if optim_config.get('do_lstsq_approx', False):
-        # Make initial guess at coeffs
+        
+        # Make initial guess at coeffs using least squares.
+        # Nothing is done with this, save for returning the result, unless the next if statement is satisfied.
+        # Note, this will definitely not produce much sense if fitting was not complete after train_mse finishes.
         prediction = network(data)
         time_deriv_list, theta = library_config['type'](data, prediction, library_config)
-        x_list = [np.linalg.lstsq(theta.detach(), time_deriv.detach(), rcond=None)[0] for time_deriv in time_deriv_list]
-        coeff_vector_list = [torch.tensor(x, dtype=torch.float32, requires_grad=True) for x in x_list]
+        lstsq_guess_list = [np.linalg.lstsq(theta.detach(), time_deriv.detach(), rcond=None)[0] for time_deriv in time_deriv_list]
+    
+    if optim_config.get('use_lstsq_approx', False):
+        coeff_vector_list = [torch.tensor(lstsq_guess, dtype=torch.float32, requires_grad=True) for lstsq_guess in lstsq_guess_list]
     
     Final = False
     while True:
@@ -94,5 +97,7 @@ def DeepMoD(data, target, network_config, library_config, optim_config, print_in
         coeff_vector_list, sparsity_mask_list = zip(*[threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, library_config) for scaled_coeff_vector, coeff_vector, sparsity_mask in zip(scaled_coeff_vector_list, coeff_vector_list, sparsity_mask_list)])
         
         Final = True
-
-    return coeff_vector_list_each_iteration, scaled_coeff_vector_list_each_iteration, sparsity_mask_list_each_iteration, network
+    
+    coeff_info_tuple = (coeff_vector_list_each_iteration, scaled_coeff_vector_list_each_iteration, sparsity_mask_list_each_iteration)
+    
+    return coeff_info_tuple, lstsq_guess_list, network
