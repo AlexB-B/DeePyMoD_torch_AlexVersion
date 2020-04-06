@@ -125,9 +125,16 @@ def calculate_stress_finite_difference(time_array, input_expr, E_mods, viscs):
     return strain, stress
 
 
-def calculate_int_diff_equation(time_tensor, prediction_tensor, input_lambda, coeff_vector, sparsity_mask, library_diff_order, input_type):
+def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, sparsity_mask, library_diff_order, input_type):
     
-    coeff_array = np.array(coeff_vector.detach())
+    # time, response and coeff_vector should either all be tensors, or all be arrays.
+    if type(coeff_vector) is torch.Tensor:
+        coeff_array = coeff_vector.detach()
+        time_array = np.array(time.detach())
+    else: # else numpy array
+        time_array = time
+    
+    coeff_array = np.array(coeff_vector)
     mask_array = np.array(sparsity_mask)
     
     # Function returns masks and arrays in format such that mask values correspond to diff order etc.
@@ -136,7 +143,7 @@ def calculate_int_diff_equation(time_tensor, prediction_tensor, input_lambda, co
     if input_type == 'Strain':
         input_coeffs, input_mask = strain_coeffs_mask
         response_coeffs, response_mask = stress_coeffs_mask
-    else:
+    else: # else 'Stress'
         response_coeffs, response_mask = strain_coeffs_mask
         input_coeffs, input_mask = stress_coeffs_mask
     
@@ -151,21 +158,12 @@ def calculate_int_diff_equation(time_tensor, prediction_tensor, input_lambda, co
     max_input_diff_order = max(input_mask)
     max_response_diff_order = max(response_mask)
     
-    # Parameters designed for spooling out time array around time point of interest with each call of calc_dU_dt
-    num_girth = 1
-    num_half_depth = 50
-    num_depth = 2*num_half_depth + 1
-    
     def calc_dU_dt(U, t):
-        # U is list (seems to be converted to array before injection) of stress and increasing orders of derivative of stress.
+        # U is list (seems to be converted to array before injection) of response and increasing orders of derivative of response.
         # Returns list of derivative of each input element in U.
         
-        # To calculate numerical derivs, spool out time points around point of interest, calculating associated input values...
-        t_temp = np.linspace(t-num_girth, t+num_girth, num_depth)
-        input_array = input_lambda(t_temp)
-        
-        # ... Then calc all num derivs for all spooled time array, but retain only row of interest.
-        input_derivs = num_derivs(input_array, t_temp, max_input_diff_order)[num_half_depth, :]
+        # Calculate numerical derivatives of manipualtion variable by spooling a dummy time series around t.
+        input_derivs = num_derivs_single(t, input_lambda, max_input_diff_order)
         
         # Use masks to select manipulation terms from numerical work above...
         # ...and response terms from function parameter, considering ladder of derivative substitions.
@@ -181,15 +179,26 @@ def calculate_int_diff_equation(time_tensor, prediction_tensor, input_lambda, co
         
         return dU_dt
     
-    time_array = np.array(time_tensor.detach()).flatten()
-    # Initial values of response and response derivatives determined using torch autograd.
-    IVs = [prediction_tensor[0]]
-    for _ in range(max_response_diff_order-1):
-        IVs += [auto.grad(IVs[-1], time_tensor, create_graph=True)[0][0]]
+    # Initial values of derivatives. IVs taken a few steps into the response curve to avoid edge effects.
+    if type(time) is torch.Tensor:
+        # Initial values of response and response derivatives determined using torch autograd.
+        IVs = [response[max_response_diff_order]]
+        for _ in range(max_response_diff_order-1):
+            IVs += [auto.grad(IVs[-1], time, create_graph=True)[0][max_response_diff_order]]
+
+        IVs = [IV.item() for IV in IVs]
+    else: # else numpy array
+        # Initial values of response and response derivatives determined using numpy gradient.
+        input_derivs = num_derivs(response, time_array, max_response_diff_order-1)[max_response_diff_order, :]
+        IVs = list(input_derivs)
     
-    IVs = [IV.item() for IV in IVs]
+    reduced_time_array = time_array[max_response_diff_order:].flatten()
     
-    calculated_response_array = integ.odeint(calc_dU_dt, IVs, time_array)[:, 0:1]
+    calculated_response_array = integ.odeint(calc_dU_dt, IVs, reduced_time_array)[:, 0:1]
+    
+    # The few skipped values from edge effect avoidance tacked on again.
+    calculated_response_array_initial = np.array(response[:max_response_diff_order])
+    calculated_response_array = np.concatenate((calculated_response_array_initial, calculated_response_array))
     
     return calculated_response_array
 
@@ -234,7 +243,7 @@ def calculate_finite_difference_diff_equation(time_array, strain_array, stress_a
         response_expr = stress_expr
         input_syms = eps_syms
         response_syms = sig_syms
-    else:
+    else: # else 'Stress'
         input_array = stress_array
         response_array = strain_array
         input_expr = stress_expr
@@ -422,3 +431,17 @@ def num_derivs(dependent_data, independent_data, diff_order):
         data_derivs = np.append(data_derivs, np.gradient(data_derivs[:, -1].flatten(), independent_data.flatten()).reshape(-1,1), axis=1)
     
     return data_derivs
+
+
+def num_derivs_single(t, input_lambda, diff_order, num_girth=1, num_half_depth=50):
+    
+    num_depth = 2*num_half_depth + 1
+    
+    # To calculate numerical derivs, spool out time points around point of interest, calculating associated input values...
+    t_temp = np.linspace(t-num_girth, t+num_girth, num_depth)
+    input_array = input_lambda(t_temp)
+
+    # ... Then calc all num derivs for all spooled time array, but retain only row of interest.
+    input_derivs = num_derivs(input_array, t_temp, diff_order)[num_half_depth, :]
+    
+    return input_derivs
