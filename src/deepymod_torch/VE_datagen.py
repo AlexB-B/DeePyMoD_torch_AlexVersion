@@ -7,7 +7,7 @@ import torch.autograd as auto
 import deepymod_torch.VE_params as VE_params
 
 
-#Data generation routines
+# Data generation using Boltzmann superposition integrals.
 def calculate_strain_stress(input_type, time_array, input_expr, E_mods, viscs, D_input_lambda=None):
     
     if D_input_lambda:
@@ -76,6 +76,7 @@ def relax_creep(E_mods, viscs, input_type):
     return relax_creep_lambda
 
 
+# Data generation using finite difference approx of models.
 def calculate_strain_finite_difference(time_array, input_expr, E_mods, viscs):
     # input is stress, model is GKM
     
@@ -125,6 +126,7 @@ def calculate_stress_finite_difference(time_array, input_expr, E_mods, viscs):
     return strain, stress
 
 
+# Data generation from differential equation
 def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, sparsity_mask, library_diff_order, input_type):
     
     # time, response and coeff_vector should either all be tensors, or all be arrays.
@@ -342,6 +344,7 @@ def align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order):
     return strain_coeffs_mask, stress_coeffs_mask
 
 
+# Wave packet lambda generation
 def wave_packet_lambdas_sum(freq_max, freq_step, std_dev):
     
     # changing freq_max changes the 'detail' in the wave packet.
@@ -397,7 +400,7 @@ def wave_packet_lambdas_integ(freq_max, std_dev):
     return output_lambda, d_output_lambda, torch_output_lambda
 
 
-#Data Validation routines
+#Data Validation routine
 def equation_residuals(time_array, strain_array, stress_array, E_mods, viscs, input_type):
     
     diff_order = len(viscs)
@@ -423,6 +426,7 @@ def equation_residuals(time_array, strain_array, stress_array, E_mods, viscs, in
     return residuals
 
 
+# Numerical derivatives using NumPy
 def num_derivs(dependent_data, independent_data, diff_order):
     
     data_derivs = dependent_data.copy()
