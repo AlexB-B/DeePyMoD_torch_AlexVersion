@@ -437,8 +437,10 @@ def num_derivs(dependent_data, independent_data, diff_order):
     return data_derivs
 
 
-def num_derivs_single(t, input_lambda, diff_order, num_girth=1, num_half_depth=50):
+def num_derivs_single(t, input_lambda, diff_order, num_girth=1, num_depth=101):
     
+    # num_depth must end up odd. If an even number is provided, num_depth ends up as provided+1.
+    num_half_depth = num_depth // 2
     num_depth = 2*num_half_depth + 1
     
     # To calculate numerical derivs, spool out time points around point of interest, calculating associated input values...
