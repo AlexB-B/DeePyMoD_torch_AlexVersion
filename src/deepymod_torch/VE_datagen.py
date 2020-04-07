@@ -131,7 +131,7 @@ def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, spar
     
     # time, response and coeff_vector should either all be tensors, or all be arrays.
     if type(coeff_vector) is torch.Tensor:
-        coeff_array = coeff_vector.detach()
+        coeff_vector = coeff_vector.detach()
         time_array = np.array(time.detach())
     else: # else numpy array
         time_array = time
@@ -199,7 +199,7 @@ def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, spar
     calculated_response_array = integ.odeint(calc_dU_dt, IVs, reduced_time_array)[:, 0:1]
     
     # The few skipped values from edge effect avoidance tacked on again.
-    calculated_response_array_initial = np.array(response[:max_response_diff_order])
+    calculated_response_array_initial = np.array(response[:max_response_diff_order].detach())
     calculated_response_array = np.concatenate((calculated_response_array_initial, calculated_response_array))
     
     return calculated_response_array
