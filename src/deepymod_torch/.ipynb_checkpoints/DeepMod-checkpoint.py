@@ -52,11 +52,11 @@ def DeepMoD(data, target, network_config, library_config, optim_config, print_in
     sparsity_mask_list_each_iteration = []
     scaled_coeff_vector_list_each_iteration = []
     
+    lstsq_guess_list = []
     # Initial training to just minimise MSE. coeff_vector_list only necessary for housekeeping.
     if 'mse_only_iterations' in optim_config:
         print('Training MSE only')
         train_mse(data, target, network, coeff_vector_list, optim_config_internal, print_interval=print_interval, plot=plot)
-        
         # Make initial guess at coeffs using least squares.
         # Nothing is done with this, save for returning the result, unless the next if statement is satisfied.
         # Note, this will definitely not produce much sense if fitting was not complete after train_mse finishes.
