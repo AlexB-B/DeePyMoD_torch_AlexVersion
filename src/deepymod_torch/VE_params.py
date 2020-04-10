@@ -233,7 +233,7 @@ def kelvin_params_to_maxwell(E_mod_list, visc_list, print_expressions=False):
 
 def scaled_coeffs_from_true(true_coeffs, time_sf, strain_sf, stress_sf):
     
-    true_coeffs_array = np.array(true_coeffs)
+    true_coeffs_array = np.array(true_coeffs).flatten()
     alpha_array = coeff_scaling_values(true_coeffs_array, time_sf, strain_sf, stress_sf)
     scaled_coeff_guess = true_coeffs_array*alpha_array
     
@@ -242,7 +242,7 @@ def scaled_coeffs_from_true(true_coeffs, time_sf, strain_sf, stress_sf):
 
 def true_coeffs_from_scaled(scaled_coeffs, time_sf, strain_sf, stress_sf):
     
-    scaled_coeffs_array = np.array(scaled_coeffs)
+    scaled_coeffs_array = np.array(scaled_coeffs).flatten()
     alpha_array = coeff_scaling_values(scaled_coeffs_array, time_sf, strain_sf, stress_sf)
     true_coeffs = scaled_coeffs_array/alpha_array
     
