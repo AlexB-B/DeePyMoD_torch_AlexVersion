@@ -155,7 +155,7 @@ def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, spar
     # The coeff for the highest derivative of response variable is left behind, and moved later.
     neg_response_coeffs = -response_coeffs[:-1]
     coeffs_less_dadt_array = np.concatenate((input_coeffs, neg_response_coeffs))
-    
+        
     # Don't skip derivative orders, but avoids calculating higher derivatives than were eliminated.
     max_input_diff_order = max(input_mask)
     max_response_diff_order = max(response_mask)
@@ -181,25 +181,30 @@ def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, spar
         
         return dU_dt
     
+    start_index = max_response_diff_order # If want to start recalc at different point modify start_index NOT max_response_diff_order. Default behaviour is to take same value but 2 different purposes.
     # Initial values of derivatives. IVs taken a few steps into the response curve to avoid edge effects.
     if type(time) is torch.Tensor:
         # Initial values of response and response derivatives determined using torch autograd.
-        IVs = [response[max_response_diff_order]]
+        IVs = [response[start_index]]
         for _ in range(max_response_diff_order-1):
-            IVs += [auto.grad(IVs[-1], time, create_graph=True)[0][max_response_diff_order]]
+            IVs += [auto.grad(IVs[-1], time, create_graph=True)[0][start_index]]
 
         IVs = [IV.item() for IV in IVs]
+        
+        # The few skipped values from edge effect avoidance tacked on again.
+        calculated_response_array_initial = np.array(response[:start_index].detach())
     else: # else numpy array
         # Initial values of response and response derivatives determined using numpy gradient.
-        input_derivs = num_derivs(response, time_array, max_response_diff_order-1)[max_response_diff_order, :]
+        input_derivs = num_derivs(response, time_array, max_response_diff_order-1)[start_index, :]
         IVs = list(input_derivs)
+        
+        # The few skipped values from edge effect avoidance tacked on again.
+        calculated_response_array_initial = response[:start_index]
     
-    reduced_time_array = time_array[max_response_diff_order:].flatten()
+    reduced_time_array = time_array[start_index:].flatten()
     
     calculated_response_array = integ.odeint(calc_dU_dt, IVs, reduced_time_array)[:, 0:1]
     
-    # The few skipped values from edge effect avoidance tacked on again.
-    calculated_response_array_initial = np.array(response[:max_response_diff_order].detach())
     calculated_response_array = np.concatenate((calculated_response_array_initial, calculated_response_array))
     
     return calculated_response_array
@@ -431,13 +436,16 @@ def num_derivs(dependent_data, independent_data, diff_order):
 
 def num_derivs_single(t, input_lambda, diff_order, num_girth=1, num_depth=101):
     
+    # Higher derivs need further reaching context for accuracy.
+    mod_num_girth = num_girth*diff_order
+    
     # num_depth must end up odd. If an even number is provided, num_depth ends up as provided+1.
     num_half_depth = num_depth // 2
     num_depth = 2*num_half_depth + 1
     
     # To calculate numerical derivs, spool out time points around point of interest, calculating associated input values...
-    t_temp = np.linspace(t-num_girth, t+num_girth, num_depth)
-    input_array = input_lambda(t_temp)
+    t_temp = np.linspace(t-mod_num_girth, t+mod_num_girth, num_depth)
+    input_array = input_lambda(t_temp) # Divide by zeros will probably result in Inf values which could cause derivative issues
 
     # ... Then calc all num derivs for all spooled time array, but retain only row of interest.
     input_derivs = num_derivs(input_array, t_temp, diff_order)[num_half_depth, :]
