@@ -1,15 +1,21 @@
 import numpy as np
 import sympy as sym
+import IPython.display as dis
 
 
-# KELVIN MODEL
-
-def model_params_from_coeffs_kelvin(coeff_vector, print_expressions=False):
+def model_params_from_coeffs(coeff_vector, model, print_expressions=False):
     
-    coeff_expression_list, model_params_mask_list = kelvin_coeff_expressions(len(coeff_vector))
+    order = len(coeff_vector)//2
+    
+    if model == 'GMM':
+        coeff_expression_list, model_params_mask_list = maxwell_coeff_expressions(order)
+    else: # model == 'GKM'
+        coeff_expression_list, model_params_mask_list = kelvin_coeff_expressions(order)
+    
+    coeff_expression_list = [sym.simplify(coeff_expression/coeff_expression_list[1]) for i, coeff_expression in enumerate(coeff_expression_list) if i != 1]
     
     if print_expressions:
-        print(coeff_expression_list)
+        dis.display(*coeff_expression_list)
     
     coeff_equations_list = [coeff_expression - coeff_value for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
     
@@ -18,27 +24,34 @@ def model_params_from_coeffs_kelvin(coeff_vector, print_expressions=False):
     if len(model_params_value_list) == 0:
         print('No solution possible for coefficient values and model complexity arrived at.')
     
+    # Note, the returned solution may still contain 1 (or more?) symbols. This does not mean sym.solve() has failed.
+    # Instead, it means that more than 1 set of model params can give rise to the given coeffs.
+    # The symbol(s) remaining describe the common pattern in the model params for the same coeffs.
     return model_params_value_list, model_params_mask_list
 
 
-def coeffs_from_model_params_kelvin(E_mod_list, visc_list, print_expressions=False):
+def coeffs_from_model_params(E_mod_list, visc_list, model, print_expressions=False):
     
-    coeff_count = len(E_mod_list)*2 - 1
+    order = len(visc_list)
     
-    coeff_expression_list, model_params_mask_list = kelvin_coeff_expressions(coeff_count)
+    if model == 'GMM':
+        coeff_expression_list, model_params_mask_list = maxwell_coeff_expressions(order)
+    else: # model == 'GKM'
+        coeff_expression_list, model_params_mask_list = kelvin_coeff_expressions(order)
     
     if print_expressions:
-        print(coeff_expression_list)
+        dis.display(*coeff_expression_list)
     
     coeff_value_list = [coeff_expression.subs(zip(model_params_mask_list, E_mod_list+visc_list)) for coeff_expression in coeff_expression_list]
+    coeff_value_list = [coeff_value/coeff_value_list[1] for i, coeff_value in enumerate(coeff_value_list) if i != 1]
     
     return coeff_value_list
 
 
-def kelvin_coeff_expressions(coeff_count):
-    
-    order = coeff_count // 2
-    
+# KELVIN MODEL
+
+def kelvin_coeff_expressions(order):
+        
     eps, sig = sym.symbols('epsilon,sigma', real=True)
     E_0 = sym.symbols('E^K_0', real=True, negative=False)
     
@@ -46,29 +59,17 @@ def kelvin_coeff_expressions(coeff_count):
     summation, model_params_list = kelvin_sym_sum(order)
     model_params_list = [E_0] + model_params_list
     RHS = (1/E_0 + summation)*sig
-    RHS = sym.together(RHS)
-    RHS, denom = sym.fraction(RHS)
+    RHS = RHS.together()
+    stress_side, denom = sym.fraction(RHS)
+    strain_side = eps*denom
+    strain_side, stress_side = strain_side.expand(), stress_side.expand() # required for .coeff() to work.
     
-    full_expression = RHS - eps*denom
-    
-    #find coeffs - prep
-    expanded = sym.expand(full_expression)
     dt = sym.symbols('dt')
     
-    #fix expressions by making coefficient of first derivative of strain equal to 1
-    Strain_t_coeff_expr = -expanded.coeff(eps, 1).coeff(dt, 1)
-    
-    #Strain coeffs
-    coeff_expression = -expanded.coeff(eps, 1).coeff(dt, 0)/Strain_t_coeff_expr
-    coeff_expressions_list = [sym.simplify(coeff_expression)]
-    for strain_order in range(2, order+1):
-        coeff_expression = -expanded.coeff(eps, 1).coeff(dt, strain_order)/Strain_t_coeff_expr
-        coeff_expressions_list += [sym.simplify(coeff_expression)]
-        
-    #Stress coeffs
-    for stress_order in range(order+1):
-        coeff_expression = expanded.coeff(sig, 1).coeff(dt, stress_order)/Strain_t_coeff_expr
-        coeff_expressions_list += [sym.simplify(coeff_expression)]
+    # coeff of strain_t NOT 1. This function returns basic (simplist?) expressions for all coeffs.
+    # Strain coeff expressions always first by convention.
+    coeff_expressions_list = [strain_side.coeff(eps, 1).coeff(dt, strain_order) for strain_order in range(order+1)]
+    coeff_expressions_list += [stress_side.coeff(sig, 1).coeff(dt, stress_order) for stress_order in range(order+1)]
     
     return coeff_expressions_list, model_params_list
 
@@ -91,41 +92,8 @@ def kelvin_sym_sum(order):
 
 # MAXWELL MODEL
 
-def model_params_from_coeffs_maxwell(coeff_vector, print_expressions=False):
-    
-    coeff_expression_list, model_params_mask_list = maxwell_coeff_expressions(len(coeff_vector))
-    
-    if print_expressions:
-        print(coeff_expression_list)
-    
-    coeff_equations_list = [coeff_expression - coeff_value for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
-    
-    model_params_value_list = sym.solve(coeff_equations_list, model_params_mask_list)
-    
-    if len(model_params_value_list) == 0:
-        print('No solution possible for coefficient values and model complexity arrived at.')
-    
-    return model_params_value_list, model_params_mask_list
-
-
-def coeffs_from_model_params_maxwell(E_mod_list, visc_list, print_expressions=False):
-    
-    coeff_count = len(E_mod_list)*2 - 1
-    
-    coeff_expression_list, model_params_mask_list = maxwell_coeff_expressions(coeff_count)
-    
-    if print_expressions:
-        print(coeff_expression_list)
-    
-    coeff_value_list = [coeff_expression.subs(zip(model_params_mask_list, E_mod_list+visc_list)) for coeff_expression in coeff_expression_list]
-    
-    return coeff_value_list
-
-
-def maxwell_coeff_expressions(coeff_count):
-    
-    order = coeff_count // 2
-    
+def maxwell_coeff_expressions(order):
+        
     eps, sig = sym.symbols('epsilon,sigma', real=True)
     E_0 = sym.symbols('E^M_0', real=True, negative=False)
     
@@ -133,29 +101,17 @@ def maxwell_coeff_expressions(coeff_count):
     summation, model_params_list = maxwell_sym_sum(order)
     model_params_list = [E_0] + model_params_list
     RHS = (E_0 + summation)*eps
-    RHS = sym.together(RHS)
-    RHS, denom = sym.fraction(RHS)
-    
-    full_expression = RHS - sig*denom
-    
-    #find coeffs - prep
-    expanded = sym.expand(full_expression)
+    RHS = RHS.together()
+    strain_side, denom = sym.fraction(RHS)
+    stress_side = sig*denom
+    strain_side, stress_side = strain_side.expand(), stress_side.expand() # required for .coeff() to work.
+
     dt = sym.symbols('dt')
     
-    #fix expressions by making coefficient of first derivative of strain equal to 1
-    Strain_t_coeff_expr = -expanded.coeff(eps, 1).coeff(dt, 1)
-    
-    #Strain coeffs
-    coeff_expression = -expanded.coeff(eps, 1).coeff(dt, 0)/Strain_t_coeff_expr
-    coeff_expressions_list = [sym.simplify(coeff_expression)]
-    for strain_order in range(2, order+1):
-        coeff_expression = -expanded.coeff(eps, 1).coeff(dt, strain_order)/Strain_t_coeff_expr
-        coeff_expressions_list += [sym.simplify(coeff_expression)]
-        
-    #Stress coeffs
-    for stress_order in range(order+1):
-        coeff_expression = expanded.coeff(sig, 1).coeff(dt, stress_order)/Strain_t_coeff_expr
-        coeff_expressions_list += [sym.simplify(coeff_expression)]
+    # coeff of strain_t NOT 1. This function returns basic (simplist?) expressions for all coeffs.
+    # Strain coeff expressions always first by convention.
+    coeff_expressions_list = [strain_side.coeff(eps, 1).coeff(dt, strain_order) for strain_order in range(order+1)]
+    coeff_expressions_list += [stress_side.coeff(sig, 1).coeff(dt, stress_order) for stress_order in range(order+1)]
     
     return coeff_expressions_list, model_params_list
 
@@ -179,54 +135,40 @@ def maxwell_sym_sum(order):
 
 # CONVERT BETWEEN MODELS
 
-def maxwell_kelvin_conversions(problem_order):
+def convert_to_kelvin_params(E_mod_list, visc_list):
     
-    coeff_count = problem_order*2 + 1
+    order = len(visc_list)
     
-    kelvin_coeff_expression_list, kelvin_model_params_mask_list = kelvin_coeff_expressions(coeff_count)
-    maxwell_coeff_expression_list, maxwell_model_params_mask_list = maxwell_coeff_expressions(coeff_count)
-    
-    coeff_equations_list = [kelvin_coeff_expression - maxwell_coeff_expression for kelvin_coeff_expression, maxwell_coeff_expression in zip(kelvin_coeff_expression_list, maxwell_coeff_expression_list)]
-    
-    maxwell_param_exprs = sym.solve(coeff_equations_list, maxwell_model_params_mask_list)[0]
-    kelvin_param_exprs = sym.solve(coeff_equations_list, kelvin_model_params_mask_list)[0]
-    
-    maxwell_solutions = maxwell_param_exprs, maxwell_model_params_mask_list
-    kelvin_solutions = kelvin_param_exprs, kelvin_model_params_mask_list
-    
-    return maxwell_solutions, kelvin_solutions
-
-
-def maxwell_params_to_kelvin(E_mod_list, visc_list, print_expressions=False):
-    
-    problem_order = len(visc_list)
-    
-    maxwell_solutions, kelvin_solutions = maxwell_kelvin_conversions(problem_order)
-    _, maxwell_model_params_mask_list = maxwell_solutions
-    kelvin_param_exprs, kelvin_model_params_mask_list = kelvin_solutions
-    
-    if print_expressions:
-        print(kelvin_param_exprs)
+    # Calculate coeffs that should be the same for both models.
+    # I don't call coeffs_from_model_params() because I don't want to divide by strain_t coeff - no need!
+    maxwell_expression_list, maxwell_syms_list = maxwell_coeff_expressions(order)
+    coeff_value_list = [maxwell_expression.subs(zip(maxwell_syms_list, E_mod_list+visc_list)) for maxwell_expression in maxwell_expression_list]
         
-    kelvin_params = [kelvin_param_expr.subs(zip(maxwell_model_params_mask_list, E_mod_list+visc_list)) for kelvin_param_expr in kelvin_param_exprs]
+    # Use coeffs to solve for new set of model params.
+    # I don't call model_params_from_coeffs() for same reason as above.
+    kelvin_expression_list, kelvin_syms_list = kelvin_coeff_expressions(order)
+    coeff_equations_list = [kelvin_expression - coeff_value for kelvin_expression, coeff_value in zip(kelvin_expression_list, coeff_value_list)]
+    params = sym.solve(coeff_equations_list, kelvin_syms_list)
     
-    return kelvin_params, kelvin_model_params_mask_list
+    return params, kelvin_syms_list
 
 
-def kelvin_params_to_maxwell(E_mod_list, visc_list, print_expressions=False):
+def convert_to_maxwell_params(E_mod_list, visc_list):
     
-    problem_order = len(visc_list)
+    order = len(visc_list)
     
-    maxwell_solutions, kelvin_solutions = maxwell_kelvin_conversions(problem_order)
-    maxwell_param_exprs, maxwell_model_params_mask_list = maxwell_solutions
-    _, kelvin_model_params_mask_list = kelvin_solutions
+    # Calculate coeffs that should be the same for both models.
+    # I don't call coeffs_from_model_params() because I don't want to divide by strain_t coeff - no need!
+    kelvin_expression_list, kelvin_syms_list = kelvin_coeff_expressions(order)
+    coeff_value_list = [kelvin_expression.subs(zip(kelvin_syms_list, E_mod_list+visc_list)) for kelvin_expression in kelvin_expression_list]
     
-    if print_expressions:
-        print(kelvin_param_exprs)
-        
-    maxwell_params = [maxwell_param_expr.subs(zip(kelvin_model_params_mask_list, E_mod_list+visc_list)) for maxwell_param_expr in maxwell_param_exprs]
+    # Use coeffs to solve for new set of model params.
+    # I don't call model_params_from_coeffs() for same reason as above.
+    maxwell_expression_list, maxwell_syms_list = maxwell_coeff_expressions(order)
+    coeff_equations_list = [maxwell_expression - coeff_value for maxwell_expression, coeff_value in zip(maxwell_expression_list, coeff_value_list)]
+    params = sym.solve(coeff_equations_list, maxwell_syms_list)
     
-    return maxwell_params, maxwell_model_params_mask_list
+    return params, maxwell_syms_list
 
 
 # SCALE COEFFS DUE TO 'NORMALISATION'
