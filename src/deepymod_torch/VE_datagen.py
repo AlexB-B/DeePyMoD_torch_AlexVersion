@@ -406,13 +406,12 @@ def equation_residuals(time_array, strain_array, stress_array, E_mods, viscs, in
     stress_theta = num_derivs(stress_array, time_array, diff_order)
     num_theta = np.concatenate((strain_theta, stress_theta), axis=1)
     
-    if input_type == 'Stress':
-        coeffs = VE_params.coeffs_from_model_params_kelvin(E_mods, viscs)
-    elif input_type == 'Strain':
-        coeffs = VE_params.coeffs_from_model_params_maxwell(E_mods, viscs)
-    else:
-        print('input_type is wrong')
-        return None
+    if input_type == 'Strain':
+        model = 'GMM'
+    else: # input_type == 'Stress'
+        model = 'GKM'
+
+    coeffs = VE_params.coeffs_from_model_params(E_mods, viscs, model)
     
     coeffs_strain_array = np.array([coeffs[0]] + [1] + coeffs[1:diff_order])
     coeffs_stress_array = np.array(coeffs[diff_order:])
