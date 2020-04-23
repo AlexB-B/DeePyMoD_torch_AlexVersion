@@ -94,7 +94,7 @@ def DeepMoD(data, target, network_config, library_config, optim_config, print_in
             break
         
         #Because of zip, the output variables are all tuples, not lists, but they function the same way
-        coeff_vector_list, sparsity_mask_list = zip(*[threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, library_config) for scaled_coeff_vector, coeff_vector, sparsity_mask in zip(scaled_coeff_vector_list, coeff_vector_list, sparsity_mask_list)])
+        coeff_vector_list, sparsity_mask_list = zip(*[threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, optim_config_internal, library_config) for scaled_coeff_vector, coeff_vector, sparsity_mask in zip(scaled_coeff_vector_list, coeff_vector_list, sparsity_mask_list)])
         
         Final = True
     
