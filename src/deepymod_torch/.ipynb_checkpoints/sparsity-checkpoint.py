@@ -27,7 +27,7 @@ def scaling(weight_vector, library, time_deriv):
     return scaled_weight_vector
 
 
-def threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, library_config):
+def threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, optim_config, library_config):
     '''
     Performs thresholding of coefficient vector based on the scaled coefficient vector.
     Components greater than the standard deviation of scaled coefficient vector are maintained, rest is set to zero.
@@ -48,9 +48,11 @@ def threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, library_config):
         tensor containing index location of non-zero components.
     '''
     
-    #reduced_sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > torch.std(scaled_coeff_vector, dim=0), coeff_vector, torch.zeros_like(scaled_coeff_vector))
-    #Alt threshold condition
-    reduced_sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > 0.05, coeff_vector, torch.zeros_like(scaled_coeff_vector))
+    thresh_func = optim_config['thresh_func']
+    thresh_val = thresh_func(scaled_coeff_vector, coeff_vector, sparsity_mask, optim_config, library_config)
+    
+    # General threshold condition
+    reduced_sparse_coeff_vector = torch.where(torch.abs(scaled_coeff_vector) > thresh_val, coeff_vector, torch.zeros_like(scaled_coeff_vector))
     indices_to_keep = torch.nonzero(reduced_sparse_coeff_vector)[:, 0]    
     sparsity_mask = sparsity_mask[indices_to_keep].detach()  # detach it so it doesn't get optimized and throws an error
     sparse_coeff_vector = coeff_vector[indices_to_keep].clone().detach().requires_grad_(True)  # so it can be optimized
