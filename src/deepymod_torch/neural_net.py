@@ -97,6 +97,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
 
     max_iterations = optim_config['max_iterations']
     l1 = optim_config['lambda']
+    kappa = optim_config.get('kappa')
     library_function = library_config['type']
     lr_coeffs = optim_config.get('lr_coeffs', 0.001) # default is default for optimizer
     betas_coeffs = optim_config.get('betas_coeffs', (0.9, 0.999)) # default is default for optimizer
@@ -133,9 +134,15 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
         # Calculating L1
         l1_cost_list = l1 * torch.stack([torch.sum(torch.abs(coeff_vector_scaled)) for coeff_vector_scaled in coeff_vector_scaled_list])
         loss_l1 = torch.sum(l1_cost_list)
-
+        
+        loss_na = 0
+        if library_config.get('coeff_sign') == 'positive':
+            # Calculating negative aversion
+            na_cost_list = kappa * torch.stack([torch.sum(nn.functional.relu(-coeff_vector_scaled))**2 for coeff_vector_scaled in coeff_vector_scaled_list])
+            loss_na = torch.sum(na_cost_list)
+        
         # Calculating total loss
-        loss = loss_MSE + loss_reg + loss_l1
+        loss = loss_MSE + loss_reg + loss_l1 + loss_na
 
         # Tensorboard stuff
         if iteration % 50 == 0:
@@ -147,6 +154,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
             for idx in np.arange(len(reg_cost_list)):
                 writer.add_scalar('Regression '+str(idx), reg_cost_list[idx], iteration)
                 writer.add_scalar('L1 '+str(idx), l1_cost_list[idx], iteration)
+                writer.add_scalar('NA '+str(idx), na_cost_list[idx], iteration)
 
                 # Coefficients
                 for element_idx, element in enumerate(torch.unbind(coeff_vector_list[idx])):
@@ -163,8 +171,8 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
             if plot:
                 update_plot(axes1, axes2, data, prediction)
             
-            print('Epoch | Total loss | MSE | PI | L1 ')
-            print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item())
+            print('Epoch | Total loss | MSE | PI | L1 | NA')
+            print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item(), loss_na.item())
             for coeff_vector in zip(coeff_vector_list, coeff_vector_scaled_list):
                 print(coeff_vector[0])
             
