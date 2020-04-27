@@ -172,7 +172,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
                 update_plot(axes1, axes2, data, prediction)
             
             print('Epoch | Total loss | MSE | PI | L1 | NA')
-            print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item(), loss_na.item())
+            print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item(), "%.1E" % loss_na.item())
             for coeff_vector in zip(coeff_vector_list, coeff_vector_scaled_list):
                 print(coeff_vector[0])
             
