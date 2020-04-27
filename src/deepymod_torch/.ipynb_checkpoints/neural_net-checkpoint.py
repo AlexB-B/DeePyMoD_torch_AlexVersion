@@ -98,6 +98,8 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     max_iterations = optim_config['max_iterations']
     l1 = optim_config.get('lambda', 10**-5)
     kappa = optim_config.get('kappa', 1)
+    if library_config.get('coeff_sign') != 'positive':
+        kappa = 0
     library_function = library_config['type']
     lr_coeffs = optim_config.get('lr_coeffs', 0.001) # default is default for optimizer
     betas_coeffs = optim_config.get('betas_coeffs', (0.9, 0.999)) # default is default for optimizer
@@ -135,11 +137,9 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
         l1_cost_list = l1 * torch.stack([torch.sum(torch.abs(coeff_vector_scaled)) for coeff_vector_scaled in coeff_vector_scaled_list])
         loss_l1 = torch.sum(l1_cost_list)
         
-        loss_na = 0
-        if library_config.get('coeff_sign') == 'positive':
-            # Calculating negative aversion
-            na_cost_list = kappa * torch.stack([torch.sum(nn.functional.relu(-coeff_vector_scaled))**2 for coeff_vector_scaled in coeff_vector_scaled_list])
-            loss_na = torch.sum(na_cost_list)
+        # Calculating negative aversion
+        na_cost_list = kappa * torch.stack([torch.sum(nn.functional.relu(-coeff_vector_scaled))**2 for coeff_vector_scaled in coeff_vector_scaled_list])
+        loss_na = torch.sum(na_cost_list)
         
         # Calculating total loss
         loss = loss_MSE + loss_reg + loss_l1 + loss_na
