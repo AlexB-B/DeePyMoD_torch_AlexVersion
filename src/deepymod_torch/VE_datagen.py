@@ -398,20 +398,15 @@ def wave_packet_lambdas_integ(freq_max, std_dev, amp):
 
 
 #Data Validation routine
-def equation_residuals(time_array, strain_array, stress_array, E_mods, viscs, input_type):
+def equation_residuals(time_array, strain_array, stress_array, coeffs):
     
-    diff_order = len(viscs)
+    # This function needs updating. Currently it can only support a series of coeffs that conform to the expected pattern. I can borrow code from elsewhere in this file surely to make it more flexible, and validate any equation, of a pattern that can have skipped derivatives etc. (provided sparsity mask, and provided it still follows essentially the same pattern ( :) ).
+    coeffs = list(coeffs)
+    diff_order = len(coeffs)//2
 
     strain_theta = num_derivs(strain_array, time_array, diff_order)
     stress_theta = num_derivs(stress_array, time_array, diff_order)
     num_theta = np.concatenate((strain_theta, stress_theta), axis=1)
-    
-    if input_type == 'Strain':
-        model = 'GMM'
-    else: # input_type == 'Stress'
-        model = 'GKM'
-
-    coeffs = VE_params.coeffs_from_model_params(E_mods, viscs, model)
     
     coeffs_strain_array = np.array([coeffs[0]] + [1] + coeffs[1:diff_order])
     coeffs_stress_array = np.array(coeffs[diff_order:])
