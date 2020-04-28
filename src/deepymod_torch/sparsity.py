@@ -48,7 +48,7 @@ def threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, optim_config, li
         tensor containing index location of non-zero components.
     '''
     
-    thresh_func = optim_config['thresh_func']
+    thresh_func = optim_config.get('thresh_func', thresh_stddev)
     thresh_val = thresh_func(scaled_coeff_vector, coeff_vector, sparsity_mask, optim_config, library_config)
     
     # General threshold condition
@@ -58,3 +58,7 @@ def threshold(scaled_coeff_vector, coeff_vector, sparsity_mask, optim_config, li
     sparse_coeff_vector = coeff_vector[indices_to_keep].clone().detach().requires_grad_(True)  # so it can be optimized
 
     return sparse_coeff_vector, sparsity_mask
+
+
+def thresh_stddev(scaled_coeff_vector, *args):
+    return torch.std(scaled_coeff_vector, dim=0)
