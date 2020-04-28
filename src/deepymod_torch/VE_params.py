@@ -63,7 +63,7 @@ def kelvin_coeff_expressions(order):
     
     dt = sym.symbols('dt')
     
-    # coeff of strain_t NOT 1. This function returns basic (simplist?) expressions for all coeffs.
+    # coeff of strain_t NOT 1.
     # Strain coeff expressions always first by convention.
     coeff_expressions_list = [strain_side.coeff(eps, 1).coeff(dt, strain_order) for strain_order in range(order+1)]
     coeff_expressions_list += [stress_side.coeff(sig, 1).coeff(dt, stress_order) for stress_order in range(order+1)]
@@ -108,7 +108,7 @@ def maxwell_coeff_expressions(order):
 
     dt = sym.symbols('dt')
     
-    # coeff of strain_t NOT 1. This function returns basic (simplist?) expressions for all coeffs.
+    # coeff of strain_t NOT 1.
     # Strain coeff expressions always first by convention.
     coeff_expressions_list = [strain_side.coeff(eps, 1).coeff(dt, strain_order) for strain_order in range(order+1)]
     coeff_expressions_list += [stress_side.coeff(sig, 1).coeff(dt, stress_order) for stress_order in range(order+1)]
@@ -153,9 +153,14 @@ def convert_between_models(E_mod_list, visc_list, origin_model, print_expression
     if print_expressions:
         print(f'{dest_model} parameters from universal coefficients:')
     
-    dest_model_value_list, dest_model_syms_list = model_params_from_coeffs(coeff_value_list, dest_model, print_expressions=print_expressions)
+    dest_model_value_list = model_params_from_coeffs(coeff_value_list, dest_model, print_expressions=print_expressions)[0]
     
-    return dest_model_value_list, dest_model_syms_list
+    # Absurd line for converting sympy objects back. [0] needed due to format of dest_model_value_list.
+    params_result = sym.lambdify(sym.symbols('null'), dest_model_value_list[0])(0)
+    E_mod_list_result = params_result[:len(E_mod_list)]
+    visc_list_result = params_result[len(E_mod_list):]
+    
+    return E_mod_list_result, visc_list_result
 
 
 # SCALE COEFFS DUE TO 'NORMALISATION'
