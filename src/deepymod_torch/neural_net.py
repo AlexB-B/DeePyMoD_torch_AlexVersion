@@ -32,10 +32,10 @@ def deepmod_init(network_config, library_config):
     '''
 
     # Building network
-    input_dim = network_config['input_dim']
-    hidden_dim = network_config['hidden_dim']
-    layers = network_config['layers']
-    output_dim = network_config['output_dim']
+    input_dim = network_config['input_dim'] # default could be based off columns in data
+    hidden_dim = network_config.get('hidden_dim', 50)
+    layers = network_config.get('layers', 4)
+    output_dim = network_config['output_dim'] # default could be based off columns in target
 
     network = [nn.Linear(input_dim, hidden_dim), nn.Tanh()]  # Input layer
 
@@ -94,15 +94,16 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     coeff_vector_list : tensor list
         list of the trained coefficient vectors.
     '''
-
-    max_iterations = optim_config['max_iterations']
+    
+    # Pull config params, using defaults where necessary.
     l1 = optim_config.get('lambda', 10**-5)
-    kappa = optim_config.get('kappa', 1)
-    if library_config.get('coeff_sign') != 'positive':
-        kappa = 0
-    library_function = library_config['type']
+    kappa = 0
+    if library_config.get('coeff_sign') == 'positive':
+        kappa = optim_config.get('kappa', 1)
+    max_iterations = optim_config.get('max_iterations', 100001) # Superfluous default as higher function should have default.
     lr_coeffs = optim_config.get('lr_coeffs', 0.001) # default is default for optimizer
     betas_coeffs = optim_config.get('betas_coeffs', (0.9, 0.999)) # default is default for optimizer
+    library_function = library_config['type'] # no reasonable default
     
     optimizer = torch.optim.Adam(({'params': network.parameters()}, {'params': coeff_vector_list, 'lr': lr_coeffs, 'betas': betas_coeffs}))
  
