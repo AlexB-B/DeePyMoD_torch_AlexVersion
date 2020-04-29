@@ -206,10 +206,12 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, print_inte
     optim_config : dict
         Dict containing parameters for training. See DeepMoD docstring.
     '''
-
-    max_iterations = optim_config['mse_only_iterations']
-
-    optimizer = torch.optim.Adam(network.parameters()) 
+    
+    # Pull config params, using defaults where necessary.
+    max_iterations = optim_config.get('mse_only_iterations', 20001) # function call requires this to exist so default is purely a failsafe.
+    betas_coeffs = optim_config.get('betas_coeffs', (0.9, 0.999)) # default is default for optimizer
+    
+    optimizer = torch.optim.Adam(network.parameters(), betas=betas_coeffs) 
     
     # preparing tensorboard writer
     writer = SummaryWriter()

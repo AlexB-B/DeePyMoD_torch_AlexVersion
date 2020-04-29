@@ -39,13 +39,15 @@ def DeepMoD(data, target, network_config, library_config, optim_config, print_in
     network : pytorch sequential model
         The trained neural network.
     '''
-
-    optim_config_internal = optim_config.copy()
     
     # Pull config params, using defaults where necessary.
     NN = network_config.get('pre-trained_network')
-    max_iterations = optim_config_internal.get('max_iterations', 100001)
-    final_run_iterations = optim_config_internal.get('final_run_iterations', 10001)
+    mse_only_iterations = optim_config.get('mse_only_iterations')
+    max_iterations = optim_config.get('max_iterations', 100001)
+    final_run_iterations = optim_config.get('final_run_iterations', 10001)
+    use_lstsq_approx = optim_config.get('use_lstsq_approx')
+    
+    optim_config_internal = optim_config.copy()
     
     # Initiating
     network, coeff_vector_list, sparsity_mask_list = deepmod_init(network_config, library_config)
@@ -59,7 +61,7 @@ def DeepMoD(data, target, network_config, library_config, optim_config, print_in
     
     lstsq_guess_list = []
     # Initial training to just minimise MSE. coeff_vector_list only necessary for housekeeping.
-    if 'mse_only_iterations' in optim_config:
+    if mse_only_iterations:
         print('Training MSE only')
         train_mse(data, target, network, coeff_vector_list, optim_config_internal, print_interval=print_interval, plot=plot)
         # Make initial guess at coeffs using least squares.
@@ -69,7 +71,7 @@ def DeepMoD(data, target, network_config, library_config, optim_config, print_in
         time_deriv_list, theta = library_config['type'](data, prediction, library_config)
         lstsq_guess_list = [np.linalg.lstsq(theta.detach(), time_deriv.detach(), rcond=None)[0] for time_deriv in time_deriv_list]
     
-    if optim_config.get('use_lstsq_approx', False):
+    if use_lstsq_approx:
         coeff_vector_list = [torch.tensor(lstsq_guess, dtype=torch.float32, requires_grad=True) for lstsq_guess in lstsq_guess_list]
     
     Final = False
