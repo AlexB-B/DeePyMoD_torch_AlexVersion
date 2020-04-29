@@ -398,19 +398,25 @@ def wave_packet_lambdas_integ(freq_max, std_dev, amp):
 
 
 #Data Validation routine
-def equation_residuals(time_array, strain_array, stress_array, coeffs):
+def equation_residuals(time_array, strain_array, stress_array, coeffs, sparsity_mask='full', diff_order='full'):
     
-    # This function needs updating. Currently it can only support a series of coeffs that conform to the expected pattern. I can borrow code from elsewhere in this file surely to make it more flexible, and validate any equation, of a pattern that can have skipped derivatives etc. (provided sparsity mask, and provided it still follows essentially the same pattern ( :) ).
-    coeffs = list(coeffs)
-    diff_order = len(coeffs)//2
+    coeffs = np.array(coeffs).reshape(-1,1)
+    
+    if sparsity_mask == 'full': # this and diff_order should either both be default, or both be specified.
+        sparsity_mask = np.arange(len(coeffs))
+        diff_order = len(coeffs)//2
+    
+    strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeffs, sparsity_mask, diff_order)
+    strain_coeffs, strain_mask = strain_coeffs_mask[0], strain_coeffs_mask[1]
+    stress_coeffs, stress_mask = stress_coeffs_mask[0], stress_coeffs_mask[1]
+    coeffs_array = np.concatenate((-strain_coeffs, stress_coeffs)).reshape(-1,1)
 
     strain_theta = num_derivs(strain_array, time_array, diff_order)
     stress_theta = num_derivs(stress_array, time_array, diff_order)
-    num_theta = np.concatenate((strain_theta, stress_theta), axis=1)
     
-    coeffs_strain_array = np.array([coeffs[0]] + [1] + coeffs[1:diff_order])
-    coeffs_stress_array = np.array(coeffs[diff_order:])
-    coeffs_array = np.concatenate((-coeffs_strain_array, coeffs_stress_array)).reshape(-1,1)
+    reduced_strain_theta = [strain_theta[:, mask_value:mask_value+1] for mask_value in strain_mask]
+    reduced_stress_theta = [stress_theta[:, mask_value:mask_value+1] for mask_value in stress_mask]
+    num_theta = np.concatenate(reduced_strain_theta + reduced_stress_theta, axis=1)
     
     residuals = num_theta @ coeffs_array
     
