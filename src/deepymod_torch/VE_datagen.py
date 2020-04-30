@@ -402,7 +402,7 @@ def equation_residuals(time_array, strain_array, stress_array, coeffs, sparsity_
     
     coeffs = np.array(coeffs).reshape(-1,1)
     
-    if sparsity_mask == 'full': # this and diff_order should either both be default, or both be specified.
+    if diff_order == 'full': # this and sparsity_mask should either both be default, or both be specified.
         sparsity_mask = np.arange(len(coeffs))
         diff_order = len(coeffs)//2
     
