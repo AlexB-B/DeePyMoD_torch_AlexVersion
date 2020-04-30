@@ -156,7 +156,7 @@ def convert_between_models(E_mod_list, visc_list, origin_model, print_expression
     dest_model_value_list = model_params_from_coeffs(coeff_value_list, dest_model, print_expressions=print_expressions)[0]
     
     # Absurd line for converting sympy objects back. [0] needed due to format of dest_model_value_list.
-    params_result = sym.lambdify(sym.symbols('null'), dest_model_value_list[0])(0)
+    params_result = list(map(float, dest_model_value_list[0]))
     E_mod_list_result = params_result[:len(E_mod_list)]
     visc_list_result = params_result[len(E_mod_list):]
     
