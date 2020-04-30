@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 from deepymod_torch.tensorboard import custom_board
 
 
-def deepmod_init(network_config, library_config):
+def deepmod_init(data, target, network_config, library_config):
     '''
     Constructs the neural network, trainable coefficient vectors and sparsity mask.
 
@@ -32,10 +32,12 @@ def deepmod_init(network_config, library_config):
     '''
 
     # Building network
-    input_dim = network_config['input_dim'] # default could be based off columns in data
+    input_dim = data.shape[1]
+#     input_dim = network_config['input_dim']
     hidden_dim = network_config.get('hidden_dim', 50)
     layers = network_config.get('layers', 4)
-    output_dim = network_config['output_dim'] # default could be based off columns in target
+    output_dim = target.shape[1]
+#     output_dim = network_config['output_dim']
 
     network = [nn.Linear(input_dim, hidden_dim), nn.Tanh()]  # Input layer
 

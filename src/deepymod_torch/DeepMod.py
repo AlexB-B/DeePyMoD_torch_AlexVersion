@@ -4,7 +4,7 @@ from deepymod_torch.sparsity import scaling, threshold
 import numpy as np
 import torch
 
-def DeepMoD(data, target, network_config, library_config, optim_config, print_interval=1000, plot=False):
+def DeepMoD(data, target, library_config, network_config={}, optim_config={}, print_interval=1000, plot=False):
     '''
     Runs the deepmod algorithm on the supplied dataset. Mostly a convenience function and can be used as
     a basis for more complex training means. First column of data must correspond to time coordinates, spatial coordinates
@@ -50,7 +50,7 @@ def DeepMoD(data, target, network_config, library_config, optim_config, print_in
     optim_config_internal = optim_config.copy()
     
     # Initiating
-    network, coeff_vector_list, sparsity_mask_list = deepmod_init(network_config, library_config)
+    network, coeff_vector_list, sparsity_mask_list = deepmod_init(data, target, network_config, library_config)
     if NN: #Overides network for pretrained network
         network = NN
     
