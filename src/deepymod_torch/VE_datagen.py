@@ -400,17 +400,19 @@ def wave_packet_lambdas_integ(freq_max, std_dev, amp):
 #Data Validation routine
 def equation_residuals(time_array, strain_array, stress_array, coeffs, sparsity_mask='full', diff_order='full'):
     
-    coeffs = np.array(coeffs).reshape(-1,1)
-    
     if diff_order == 'full': # this and sparsity_mask should either both be default, or both be specified.
         sparsity_mask = np.arange(len(coeffs))
         diff_order = len(coeffs)//2
     
+    coeffs = np.array(coeffs).astype(float)
+    sparsity_mask = np.array(sparsity_mask)
+    
     strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeffs, sparsity_mask, diff_order)
     strain_coeffs, strain_mask = strain_coeffs_mask[0], strain_coeffs_mask[1]
     stress_coeffs, stress_mask = stress_coeffs_mask[0], stress_coeffs_mask[1]
+    
     coeffs_array = np.concatenate((-strain_coeffs, stress_coeffs)).reshape(-1,1)
-
+    
     strain_theta = num_derivs(strain_array, time_array, diff_order)
     stress_theta = num_derivs(stress_array, time_array, diff_order)
     
@@ -419,7 +421,7 @@ def equation_residuals(time_array, strain_array, stress_array, coeffs, sparsity_
     num_theta = np.concatenate(reduced_strain_theta + reduced_stress_theta, axis=1)
     
     residuals = num_theta @ coeffs_array
-    
+        
     return residuals
 
 
