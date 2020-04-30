@@ -34,8 +34,8 @@ def deepmod_init(data, target, network_config, library_config):
     # Building network
     input_dim = data.shape[1]
 #     input_dim = network_config['input_dim']
-    hidden_dim = network_config.get('hidden_dim', 50)
-    layers = network_config.get('layers', 4)
+    hidden_dim = network_config['hidden_dim']
+    layers = network_config['layers']
     output_dim = target.shape[1]
 #     output_dim = network_config['output_dim']
 
@@ -98,14 +98,14 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     '''
     
     # Pull config params, using defaults where necessary.
-    l1 = optim_config.get('lambda', 10**-5)
+    l1 = optim_config['lambda']
     kappa = 0
     if library_config.get('coeff_sign') == 'positive':
-        kappa = optim_config.get('kappa', 1)
-    max_iterations = optim_config.get('max_iterations', 100001) # Superfluous default as higher function should have default.
-    lr_coeffs = optim_config.get('lr_coeffs', 0.001) # default is default for optimizer
-    betas_coeffs = optim_config.get('betas_coeffs', (0.9, 0.999)) # default is default for optimizer
-    library_function = library_config['type'] # no reasonable default
+        kappa = optim_config['kappa']
+    max_iterations = optim_config['max_iterations']
+    lr_coeffs = optim_config['lr_coeffs']
+    betas_coeffs = optim_config['betas_coeffs']
+    library_function = library_config['type']
     
     optimizer = torch.optim.Adam(({'params': network.parameters()}, {'params': coeff_vector_list, 'lr': lr_coeffs, 'betas': betas_coeffs}))
  
@@ -209,11 +209,9 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, print_inte
         Dict containing parameters for training. See DeepMoD docstring.
     '''
     
-    # Pull config params, using defaults where necessary.
-    max_iterations = optim_config.get('mse_only_iterations', 20001) # function call requires this to exist so default is purely a failsafe.
-    betas_coeffs = optim_config.get('betas_coeffs', (0.9, 0.999)) # default is default for optimizer
+    max_iterations = optim_config['max_iterations']
     
-    optimizer = torch.optim.Adam(network.parameters(), betas=betas_coeffs) 
+    optimizer = torch.optim.Adam(network.parameters()) 
     
     # preparing tensorboard writer
     writer = SummaryWriter()

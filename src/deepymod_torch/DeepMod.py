@@ -40,12 +40,14 @@ def DeepMoD(data, target, library_config, network_config={}, optim_config={}, pr
         The trained neural network.
     '''
     
+    complete_configs(network_config, optim_config)
+    
     # Pull config params, using defaults where necessary.
-    NN = network_config.get('pre-trained_network')
-    mse_only_iterations = optim_config.get('mse_only_iterations')
-    max_iterations = optim_config.get('max_iterations', 100001)
-    final_run_iterations = optim_config.get('final_run_iterations', 10001)
-    use_lstsq_approx = optim_config.get('use_lstsq_approx')
+    NN = network_config['pre-trained_network']
+    mse_only_iterations = optim_config['mse_only_iterations']
+    max_iterations = optim_config['max_iterations']
+    final_run_iterations = optim_config['final_run_iterations']
+    use_lstsq_approx = optim_config['use_lstsq_approx']
     
     optim_config_internal = optim_config.copy()
     
@@ -108,3 +110,42 @@ def DeepMoD(data, target, library_config, network_config={}, optim_config={}, pr
     coeff_info_tuple = (coeff_vector_list_each_iteration, scaled_coeff_vector_list_each_iteration, sparsity_mask_list_each_iteration)
     
     return coeff_info_tuple, lstsq_guess_list, network
+
+
+def complete_configs(network_config, optim_config):
+    
+    if 'pre-trained_network' not in network_config:
+        network_config['pre-trained_network'] = None
+    
+    if 'hidden_dim' not in network_config:
+        network_config['hidden_dim'] = 50
+        
+    if 'layers' not in network_config:
+        network_config['layers'] = 4
+    
+    if 'lambda' not in optim_config:
+        optim_config['lambda'] = 10**-5
+    
+    if 'kappa' not in optim_config:
+        optim_config['kappa'] = 1 # Even if 1, may not be used depending on library_config
+    
+    if 'lr_coeffs' not in optim_config:
+        optim_config['lr_coeffs'] = 0.001 # default is default for optimizer
+    
+    if 'betas_coeffs' not in optim_config:
+        optim_config['betas_coeffs'] = (0.9, 0.999) # default is default for optimizer
+    
+    if 'mse_only_iterations' not in optim_config:
+        optim_config['mse_only_iterations'] = None
+    
+    if 'max_iterations' not in optim_config:
+        optim_config['max_iterations'] = 100001
+    
+    if 'final_run_iterations' not in optim_config:
+        optim_config['final_run_iterations'] = 10001
+        
+    if 'use_lstsq_approx' not in optim_config:
+        optim_config['use_lstsq_approx'] = False
+        
+    if 'thresh_func' not in optim_config:
+        optim_config['thresh_func'] = lambda scaled_coeff_vector, *args: torch.std(scaled_coeff_vector, dim=0)
