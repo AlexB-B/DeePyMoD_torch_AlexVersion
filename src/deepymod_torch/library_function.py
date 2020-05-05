@@ -4,6 +4,8 @@ from torch.autograd import grad
 from itertools import combinations, product
 from functools import reduce
 
+import deepymod_torch.VE_datagen as vedg
+
 
 def library_poly(prediction, library_config):
     '''
@@ -30,6 +32,48 @@ def library_poly(prediction, library_config):
         u = torch.cat((u, u[:, order-1:order] * prediction), dim=1)
 
     return u
+
+
+def mech_library_numerical(data, prediction, library_config):
+    '''
+    This function is for debugging only and is not ever intended for proper use. It used numpy numericla derivs instead of torch auto derivs and thus must detach the prediction before calculating derivatives. This means that the affect of changing the NN params and thus the prediction on the PI loss is lost, a fundamental part of DM. However, there is some suspicion currently about the exact values of the 
+    '''
+    
+    data, prediction = data.clone().detach(), prediction.clone().detach()
+    
+    # Begin by computing the values of the terms corresponding to the input, for which an analytical expression is given.
+    # This only needs to be done for the very first epoch, after which the values are known and stored in the library_config dictionary.
+    # The first condition checks if input_theta was previously already calculated and saved.
+    # It also checks that the previous saved input_theta was not one that corresponded to a different data tensor.
+    if ('input_theta' in library_config) and (library_config['input_theta'].shape[0] == data.shape[0]):
+        input_theta = library_config['input_theta']
+    else:
+        input_data = library_config['input_expr'](data) # Make sure input expression is NOT torch version
+        input_theta = vedg.num_derivs(input_data, data, library_config['diff_order'])        
+        library_config['input_theta'] = input_theta
+    
+    # Next use the result of the feedforward pass of the NN to calculate derivatives of your prediction with respect to time. 
+    output_theta = vedg.num_derivs(prediction, data, library_config['diff_order'])
+    
+    # Next identify the input/output as Stress/Strain and organise into returned variables
+    input_type = library_config['input_type']
+    if input_type == 'Strain':
+        strain = input_theta
+        stress = output_theta
+    elif input_type == 'Stress':
+        strain = output_theta
+        stress = input_theta
+    else:
+        print('Improper description of input choice. Was: '+input_type+'. Should be either \'Strain\' or \'Stress\'')
+        
+    strain_t = strain[:, 1:2] # Extract the first time derivative of strain
+    strain = np.concatenate((strain[:, 0:1], strain[:, 2:]), dim=1) # remove this before it gets put into theta
+    strain *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
+    theta = np.concatenate((strain, stress), dim=1) # I have arbitrarily set the convention of making Strain the first columns of data
+    
+    strain_t, theta = torch.tensor(strain_t), torch.tensor(theta)
+    
+    return [strain_t], theta
 
 
 def mech_library(data, prediction, library_config):    
