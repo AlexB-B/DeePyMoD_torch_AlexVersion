@@ -43,7 +43,7 @@ def DeepMoD(data, target, library_config, network_config={}, optim_config={}, pr
     complete_configs(network_config, optim_config)
     
     # Pull config params, using defaults where necessary.
-    NN = network_config['pre-trained_network']
+    pre_trained_network = network_config['pre_trained_network']
     mse_only_iterations = optim_config['mse_only_iterations']
     max_iterations = optim_config['max_iterations']
     final_run_iterations = optim_config['final_run_iterations']
@@ -53,8 +53,8 @@ def DeepMoD(data, target, library_config, network_config={}, optim_config={}, pr
     
     # Initiating
     network, coeff_vector_list, sparsity_mask_list = deepmod_init(data, target, network_config, library_config)
-    if NN: #Overides network for pretrained network
-        network = NN
+    if pre_trained_network: # Overides network for pretrained network
+        network = pre_trained_network
     
     original_coeff_vector_list = coeff_vector_list.copy()
     coeff_vector_list_each_iteration = []
@@ -114,8 +114,8 @@ def DeepMoD(data, target, library_config, network_config={}, optim_config={}, pr
 
 def complete_configs(network_config, optim_config):
     
-    if 'pre-trained_network' not in network_config:
-        network_config['pre-trained_network'] = None
+    if 'pre_trained_network' not in network_config:
+        network_config['pre_trained_network'] = None
     
     if 'hidden_dim' not in network_config:
         network_config['hidden_dim'] = 50
