@@ -13,7 +13,8 @@ def model_params_from_coeffs(coeff_vector, model, print_expressions=False):
         coeff_expression_list, model_params_mask_list = kelvin_coeff_expressions(order)
     
     if print_expressions:
-        dis.display(*coeff_expression_list)
+        coeff_equations_list = [sym.Eq(coeff_expression, coeff_value) for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
+        dis.display(*coeff_equations_list)
     
     coeff_equations_list = [coeff_expression - coeff_value for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
     
