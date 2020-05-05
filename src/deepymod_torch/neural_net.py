@@ -8,6 +8,7 @@ from IPython import display
 from deepymod_torch.sparsity import scaling
 from torch.utils.tensorboard import SummaryWriter
 from deepymod_torch.tensorboard import custom_board
+import deepymod_torch.VE_datagen as vedg
 
 
 def deepmod_init(data, target, network_config, library_config):
@@ -182,6 +183,14 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
             seconds = time.time() - start_time
             print('Time elapsed:', seconds//60, 'minutes', seconds%60, 'seconds')
             
+            # Testing why PI is crap
+#             diff_order = library_config['diff_order']
+# #             DV_errors = vedg.equation_residuals(data.detach(), library_config['strain_array'], prediction.detach(), coeff_vector_list[0].detach(), sparsity_mask=sparsity_mask_list[0], diff_order=diff_order) # will not work if input is stress
+#             DV_errors = vedg.equation_residuals_auto(theta.detach(), time_deriv_list[0].detach(), coeff_vector_list[0].detach(), sparsity_mask=sparsity_mask_list[0], diff_order=diff_order)
+#             to_print = np.mean(DV_errors[diff_order:-diff_order]**2)
+            
+#             print('DV result is:', to_print)
+            
         # Optimizer step
         optimizer.zero_grad()
         loss.backward()
@@ -209,7 +218,7 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, print_inte
         Dict containing parameters for training. See DeepMoD docstring.
     '''
     
-    max_iterations = optim_config['max_iterations']
+    mse_only_iterations = optim_config['mse_only_iterations']
     
     optimizer = torch.optim.Adam(network.parameters()) 
     
@@ -223,7 +232,7 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, print_inte
     start_time = time.time()
     
     # Training
-    for iteration in np.arange(max_iterations):
+    for iteration in np.arange(mse_only_iterations):
         # Calculating prediction and library
         prediction = network(data)
 
