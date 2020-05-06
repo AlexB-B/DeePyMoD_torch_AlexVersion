@@ -195,8 +195,8 @@ def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, spar
         calculated_response_array_initial = np.array(response[:start_index].detach())
     else: # else numpy array
         # Initial values of response and response derivatives determined using numpy gradient.
-        input_derivs = num_derivs(response, time_array, max_response_diff_order-1)[start_index, :]
-        IVs = list(input_derivs)
+        response_derivs = num_derivs(response, time_array, max_response_diff_order-1)[start_index, :]
+        IVs = list(response_derivs)
         
         # The few skipped values from edge effect avoidance tacked on again.
         calculated_response_array_initial = response[:start_index]
@@ -207,6 +207,50 @@ def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, spar
     
     calculated_response_array = np.concatenate((calculated_response_array_initial, calculated_response_array))
     
+    return calculated_response_array
+
+
+def calculate_int_diff_equation_initial(time_array, input_lambda, coeff_array, input_type):
+    
+    mask_array = np.arange(len(coeff_array))
+    library_diff_order = len(coeff_array) // 2
+    
+    # Function returns masks and arrays in format such that mask values correspond to diff order etc.
+    strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeff_array, mask_array, library_diff_order)
+    
+    if input_type == 'Strain':
+        input_coeffs, input_mask = strain_coeffs_mask
+        response_coeffs, response_mask = stress_coeffs_mask
+    else: # else 'Stress'
+        response_coeffs, response_mask = strain_coeffs_mask
+        input_coeffs, input_mask = stress_coeffs_mask
+    
+    # Coeffs as stated refer to an equation with all stress terms on one side, and all strain on the other.
+    # Depending on which coeffs are paired with the response, they must be moved across to the other side.
+    # This is accomplished by making them negative, and concatenating carefully to prepare for alignment with correct terms.
+    # The coeff for the highest derivative of response variable is left behind, and moved later.
+    neg_response_coeffs = -response_coeffs[:-1]
+    coeffs_less_dadt_array = np.concatenate((input_coeffs, neg_response_coeffs))
+    
+    def calc_dU_dt(U, t):
+        # U is list (seems to be converted to array before injection) of response and increasing orders of derivative of response.
+        # Returns list of derivative of each input element in U.
+        
+        # Calculate numerical derivatives of manipualtion variable by spooling a dummy time series around t.
+        input_derivs = num_derivs_single(t, input_lambda, library_diff_order)
+        
+        terms_array = np.concatenate((input_derivs, U[:-1]))
+
+        # Multiply aligned coeff-term pairs and divide by coeff of highest order deriv of response variable.
+        da_dt = np.sum(coeffs_less_dadt_array*terms_array)/response_coeffs[-1]
+        
+        dU_dt = list(U[1:]) + [da_dt]
+        
+        return dU_dt
+    
+    IVs = [0] * library_diff_order
+    calculated_response_array = integ.odeint(calc_dU_dt, IVs, time_array)[:, 0:1]
+        
     return calculated_response_array
 
 
