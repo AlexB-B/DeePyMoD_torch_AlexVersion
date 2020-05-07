@@ -21,6 +21,7 @@ def model_params_from_coeffs(coeff_vector, model, print_expressions=False):
     model_params_value_list = sym.solve(coeff_equations_list, model_params_mask_list)
     
     if len(model_params_value_list) == 0:
+        model_params_value_list = [()] # Preserve structure for indexing consistency
         print('No solution possible for coefficient values and model complexity arrived at.')
     
     # Note, the returned solution may still contain 1 (or more?) symbols. This does not mean sym.solve() has failed.
@@ -157,7 +158,7 @@ def convert_between_models(E_mod_list, visc_list, origin_model, print_expression
     dest_model_value_list = model_params_from_coeffs(coeff_value_list, dest_model, print_expressions=print_expressions)[0]
     
     # Absurd line for converting sympy objects back. [0] needed due to format of dest_model_value_list.
-    params_result = list(map(float, dest_model_value_list[0]))
+    params_result = [float(param) for param in dest_model_value_list[0]]
     E_mod_list_result = params_result[:len(E_mod_list)]
     visc_list_result = params_result[len(E_mod_list):]
     
