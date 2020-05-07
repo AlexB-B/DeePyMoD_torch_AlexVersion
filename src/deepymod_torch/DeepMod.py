@@ -48,6 +48,9 @@ def DeepMoD(data, target, library_config, network_config={}, optim_config={}, pr
     max_iterations = optim_config['max_iterations']
     final_run_iterations = optim_config['final_run_iterations']
     use_lstsq_approx = optim_config['use_lstsq_approx']
+    PINN = optim_config['PINN']
+    if PINN:
+        final_run_iterations = max_iterations # Overide in case of PINN to use only meaningful iteration number.
     
     optim_config_internal = optim_config.copy()
     
@@ -76,7 +79,7 @@ def DeepMoD(data, target, library_config, network_config={}, optim_config={}, pr
     if use_lstsq_approx:
         coeff_vector_list = [torch.tensor(lstsq_guess, dtype=torch.float32, requires_grad=True) for lstsq_guess in lstsq_guess_list]
     
-    Final = False
+    Final = PINN
     while True:
         
         if Final:
@@ -122,6 +125,9 @@ def complete_configs(network_config, optim_config):
         
     if 'layers' not in network_config:
         network_config['layers'] = 4
+    
+    if 'PINN' not in optim_config:
+        optim_config['PINN'] = False
     
     if 'lambda' not in optim_config:
         optim_config['lambda'] = 10**-5
