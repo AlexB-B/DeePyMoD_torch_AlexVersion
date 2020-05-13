@@ -115,7 +115,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
     writer.add_custom_scalars(custom_board(target, coeff_vector_list))
     
     if plot: # only works for ODEs (one independant variable)
-        axes1, axes2 = prep_plot(data, target)
+        axes = prep_plot(data, target)
 
     start_time = time.time()
     
@@ -173,7 +173,7 @@ def train(data, target, network, coeff_vector_list, sparsity_mask_list, library_
             display.clear_output(wait=True)
             
             if plot:
-                update_plot(axes1, axes2, data, prediction)
+                update_plot(axes, data, prediction)
             
             print('Epoch | Total loss | MSE | PI | L1 | NA')
             print(iteration, "%.1E" % loss.item(), "%.1E" % loss_MSE.item(), "%.1E" % loss_reg.item(), "%.1E" % loss_l1.item(), "%.1E" % loss_na.item())
@@ -227,7 +227,7 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, print_inte
     writer.add_custom_scalars(custom_board(target, coeff_vector_list))
     
     if plot:
-        axes1, axes2 = prep_plot(data, target)
+        axes = prep_plot(data, target)
     
     start_time = time.time()
     
@@ -255,7 +255,7 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, print_inte
             display.clear_output(wait=True)
             
             if plot:
-                update_plot(axes1, axes2, data, prediction)
+                update_plot(axes, data, prediction)
             
             print('Epoch | MSE loss ')
             print(iteration, "%.1E" % loss.item())
@@ -272,32 +272,59 @@ def train_mse(data, target, network, coeff_vector_list, optim_config, print_inte
     return
 
 
+# def prep_plot(data, target):
+    
+#     number_graphs = target.shape[1]
+#     fig, axes1 = plt.subplots(ncols=number_graphs, squeeze=False, figsize=(6.4*number_graphs, 4.8)) # 6.4 and 4.8 are the default graph plot dimensions
+#     axes1 = axes1.flatten()
+#     plt.title('Current prediction ability of network')
+#     colour = 'blue'
+#     axes2 = np.array([])
+#     for col, ax1 in enumerate(axes1):
+#         ax1.set_xlabel('Time (s)')
+#         ax1.set_ylabel('Target', color=colour)
+#         ax1.plot(data.detach(), target[:, col], color=colour, linestyle='None', marker='.', markersize=1)
+#         ax1.tick_params(axis='y', labelcolor=colour)
+#         axes2 = np.append(axes2, ax1.twinx())
+#         axes2[col].tick_params(axis='y', labelcolor='red')
+    
+#     return axes1, axes2
+
+
+# def update_plot(axes1, axes2, data, prediction):
+    
+#     for col, ax2 in enumerate(axes2):
+#         ax2.clear()
+#         ax2.set_ylabel('Prediction', color='red')
+#         ax2.plot(data.detach(), prediction[:, col].detach(), color='red', linestyle='None', marker='.', markersize=1)
+#         ax2.set_ylim(axes1[col].get_ylim())
+        
+#     plt.tight_layout()
+#     display.display(plt.gcf())
+    
+    
 def prep_plot(data, target):
     
     number_graphs = target.shape[1]
-    fig, axes1 = plt.subplots(ncols=number_graphs, squeeze=False, figsize=(6.4*number_graphs, 4.8)) # 6.4 and 4.8 are the default graph plot dimensions
-    axes1 = axes1.flatten()
-    plt.title('Current prediction ability of network')
-    colour = 'blue'
-    axes2 = np.array([])
-    for col, ax1 in enumerate(axes1):
-        ax1.set_xlabel('Time (s)')
-        ax1.set_ylabel('Target', color=colour)
-        ax1.plot(data.detach(), target[:, col], color=colour, linestyle='None', marker='.', markersize=1)
-        ax1.tick_params(axis='y', labelcolor=colour)
-        axes2 = np.append(axes2, ax1.twinx())
-        axes2[col].tick_params(axis='y', labelcolor='red')
+    fig, axes = plt.subplots(ncols=number_graphs, squeeze=False, figsize=(6.4*number_graphs, 4.8)) # 6.4 and 4.8 are the default graph plot dimensions
+    axes = axes.flatten()
+    for tar, ax in enumerate(axes):
+        ax.set_title(f'Target Variable #{tar+1}')
+        ax.set_xlabel('Time (s)')
+        ax.plot(data.detach(), target[:, tar], linestyle='None', marker='.', markersize=1, color='blue', label='Target')
+        ax.plot(0, linestyle='None', marker='.', markersize=1, color='red', label='Prediction') # dummy, will be replaced by prediction
+        ax.legend(numpoints=3, markerscale=5)
     
-    return axes1, axes2
-
-
-def update_plot(axes1, axes2, data, prediction):
-    
-    for col, ax2 in enumerate(axes2):
-        ax2.clear()
-        ax2.set_ylabel('Prediction', color='red')
-        ax2.plot(data.detach(), prediction[:, col].detach(), color='red', linestyle='None', marker='.', markersize=1)
-        ax2.set_ylim(axes1[col].get_ylim())
-        
+    fig.suptitle('Current prediction ability of network', y=1.05)
     plt.tight_layout()
+    
+    return axes
+
+
+def update_plot(axes, data, prediction):
+    
+    for tar, ax in enumerate(axes):
+        del ax.lines[1]
+        ax.plot(data.detach(), prediction[:, tar].detach(), linestyle='None', marker='.', markersize=1, color='red', label='Prediction')
+        
     display.display(plt.gcf())
