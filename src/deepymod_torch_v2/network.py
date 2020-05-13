@@ -14,10 +14,13 @@ class Library(nn.Module):
 
 
 class Fitting(nn.Module):
-    def __init__(self, n_terms, n_out):
+    def __init__(self, n_equations, n_terms, library_config):
         super().__init__()
-        self.coeff_vector = nn.ParameterList([torch.nn.Parameter(torch.rand((n_terms, 1), dtype=torch.float32)) for _ in torch.arange(n_out)])
-        self.sparsity_mask = [torch.arange(n_terms) for _ in torch.arange(n_out)]
+        tensor_list = [torch.rand((n_terms, 1), dtype=torch.float32) for _ in torch.arange(n_equations)]
+        if library_config.get('coeff_sign') == 'positive':
+            tensor_list = [abs(tensor) for tensor in tensor_list]
+        self.coeff_vector = nn.ParameterList([torch.nn.Parameter(tensor) for tensor in tensor_list])
+        self.sparsity_mask = [torch.arange(n_terms) for _ in torch.arange(n_equations)]
 
     def forward(self, input):
         sparse_theta = self.apply_mask(input)
