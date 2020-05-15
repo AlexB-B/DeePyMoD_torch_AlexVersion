@@ -131,6 +131,26 @@ def mech_library(inputs, **library_config):
     return [strain_t], theta
 
 
+def mech_library_real(inputs, **library_config):    
+    
+    prediction, data = inputs
+    
+    # The first column of prediction is always strain
+    strain_derivs = auto_deriv(data, prediction[:, :1], library_config)
+    strain_theta = torch.cat((prediction[:, :1], strain_derivs), dim=1)
+    
+    # The second column is always stress
+    stress_derivs = auto_deriv(data, prediction[:, 1:], library_config)
+    stress_theta = torch.cat((prediction[:, 1:], stress_derivs), dim=1)
+    
+    strain_t = strain_theta[:, 1:2] # Extract the first time derivative of strain
+    strain_theta = torch.cat((strain_theta[:, 0:1], strain_theta[:, 2:]), dim=1) # remove this before it gets put into theta
+    strain_theta *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
+    theta = torch.cat((strain_theta, stress_theta), dim=1) # I have arbitrarily set the convention of making Strain the first columns of data
+    
+    return [strain_t], theta
+
+
 def auto_deriv(data, prediction, library_config):
     '''
     data and prediction must be single columned tensors.
