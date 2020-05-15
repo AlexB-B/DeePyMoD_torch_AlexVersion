@@ -3,7 +3,6 @@ import torch.nn as nn
 from deepymod_torch_v2.network import Fitting, Library
 
 import numpy as np
-import copy
 import deepymod_torch_v2.training as training
 
 def run_deepmod(data, target, library_config, network_config={}, optim_config={}, report_config={}):
@@ -31,16 +30,12 @@ def run_deepmod(data, target, library_config, network_config={}, optim_config={}
     
     model.fit.initial_guess = None
     if configs.optim['use_lstsq_approx']:
+        model.fit.initial_guess = lstsq_guess_list
         model.fit.coeff_vector = nn.ParameterList([nn.Parameter(torch.tensor(lstsq_guess, dtype=torch.float32)) for lstsq_guess in lstsq_guess_list])
-        model.fit.initial_guess = copy.deepcopy(model.fit.coeff_vector)
     
     optimizer = torch.optim.Adam(({'params': model.network.parameters()}, {'params': model.fit.coeff_vector.parameters(), 'lr': configs.optim['lr_coeffs'], 'betas': configs.optim['betas_coeffs']}))
     
-    if configs.optim['PINN']:
-        configs.optim['l1'] = 0.0
-        training.train(model, data, target, optimizer, configs)
-    else:
-        training.train_deepmod(model, data, target, optimizer, configs)
+    training.train_deepmod(model, data, target, optimizer, configs)
         
     return model
     
