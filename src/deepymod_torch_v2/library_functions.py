@@ -28,8 +28,9 @@ def library_deriv(data, prediction, max_order):
     return time_deriv, du
 
 
-def library_1D_in(input, poly_order, diff_order):
+def library_1D_in(input, library_config):
     prediction, data = input
+    poly_order, diff_order = library_config['poly_order'], library_config['diff_order']
     poly_list = []
     deriv_list = []
     time_deriv_list = []
@@ -59,11 +60,12 @@ def library_1D_in(input, poly_order, diff_order):
     return time_deriv_list, theta
 
 
-def library_2Din_1Dout(input, poly_order, diff_order):
+def library_2Din_1Dout(input, library_config):
         '''
         Constructs a library graph in 1D. Library config is dictionary with required terms.
         '''
         prediction, data = input
+        poly_order, diff_order = library_config['poly_order'], library_config['diff_order']
         # Polynomial
         
         u = torch.ones_like(prediction)
@@ -89,7 +91,7 @@ def library_2Din_1Dout(input, poly_order, diff_order):
         return [u_t], theta
 
     
-def mech_library(inputs, **library_config):    
+def mech_library(inputs, library_config):    
     
     prediction, data = inputs
     
@@ -131,7 +133,7 @@ def mech_library(inputs, **library_config):
     return [strain_t], theta
 
 
-def mech_library_real(inputs, **library_config):    
+def mech_library_real(inputs, library_config):    
     
     prediction, data = inputs
     
