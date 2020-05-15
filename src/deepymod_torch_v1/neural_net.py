@@ -8,7 +8,7 @@ from IPython import display
 from deepymod_torch_v1.sparsity import scaling
 from torch.utils.tensorboard import SummaryWriter
 from deepymod_torch_v1.tensorboard import custom_board
-import deepymod_torch_v1.VE_datagen as vedg
+import deepymod_torch.VE_datagen as vedg
 
 
 def deepmod_init(data, target, network_config, library_config):

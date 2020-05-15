@@ -4,7 +4,7 @@ from torch.autograd import grad
 from itertools import combinations, product
 from functools import reduce
 
-import deepymod_torch_v1.VE_datagen as vedg
+import deepymod_torch.VE_datagen as vedg
 
 
 def library_poly(prediction, library_config):
