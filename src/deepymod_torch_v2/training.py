@@ -88,7 +88,7 @@ def train_mse(model, data, target, optimizer, configs):
             if plot:
                 update_plot(axes, data, prediction)
                 
-            print('| Iteration | Progress | Time remaining |     Cost |      MSE |      Reg |       L1  |      NA |')
+            print('| Iteration | Progress | Time remaining |     Cost |      MSE |      Reg |       L1 |      NA |')
             progress(iteration.item(), start_time, max_iterations, loss.item(), torch.sum(loss_mse).item(), 0, 0, 0)
         
         if iteration % 100 == 0:
@@ -102,29 +102,32 @@ def train_mse(model, data, target, optimizer, configs):
 
 def train_deepmod(model, data, target, optimizer, configs):
     '''Performs full deepmod cycle: trains model, thresholds and trains again for unbiased estimate. Updates model in-place.'''
-    # Train first cycle and get prediction
-    train(model, data, target, optimizer, configs)
-    prediction, time_deriv_list, sparse_theta_list, coeff_vector_list = model(data)
     
-    model.fit.coeff_vector_history = [model.fit.coeff_vector]
-    model.fit.sparsity_mask_history = [model.fit.sparsity_mask]
-    
-    # Threshold, set sparsity mask and coeff vector
-    sparse_coeff_vector_list, sparsity_mask_list = threshold(coeff_vector_list, sparse_theta_list, time_deriv_list, configs.optim)
-    model.fit.sparsity_mask = sparsity_mask_list
-    model.fit.coeff_vector = torch.nn.ParameterList(sparse_coeff_vector_list)
+    if not configs.optim['PINN']:
+        # Train first cycle and get prediction
+        train(model, data, target, optimizer, configs)
+        prediction, time_deriv_list, sparse_theta_list, coeff_vector_list = model(data)
 
-    #Resetting optimizer for different shapes, train without l1 
-    optimizer.param_groups[0]['params'] = model.parameters() # packs nn and coeff_vector into same optimiser group ...
-    # but doesn't remove now duplicate coeff_vector params? I would propose to replace with the below...
-    # optimizer.param_groups[1]['params'] = model.fit.coeff_vector.parameters()
-    # or add line ...
-    # del optimizer.param_groups[1]
+        model.fit.coeff_vector_history += [model.fit.coeff_vector]
+        model.fit.sparsity_mask_history += [model.fit.sparsity_mask]
+
+        # Threshold, set sparsity mask and coeff vector
+        sparse_coeff_vector_list, sparsity_mask_list = threshold(coeff_vector_list, sparse_theta_list, time_deriv_list, configs.optim)
+        model.fit.sparsity_mask = sparsity_mask_list
+        model.fit.coeff_vector = torch.nn.ParameterList(sparse_coeff_vector_list)
+
+        #Resetting optimizer for different shapes, train without l1 
+    #     optimizer.param_groups[0]['params'] = model.parameters() # packs nn and coeff_vector into same optimiser group ...
+        # but doesn't remove now duplicate coeff_vector params? I would propose to replace with the below...
+        optimizer.param_groups[1]['params'] = model.fit.coeff_vector.parameters()
+        # or add line ...
+        # del optimizer.param_groups[1]
+        
+        configs.optim['max_iterations'] = configs.optim['final_run_iterations']
     
     #print() #empty line for correct printing
     external_values = configs.optim['l1'], configs.optim['max_iterations']
     configs.optim['l1'] = 0.0
-    configs.optim['max_iterations'] = configs.optim['final_run_iterations']
     train(model, data, target, optimizer, configs)
     configs.optim['l1'], configs.optim['max_iterations'] = external_values
     
