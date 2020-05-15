@@ -1,5 +1,5 @@
 import torch
-from deepymod_torch_v2.sparsity import scaling # Why here?
+from deepymod_torch.sparsity import scaling # Why here?
 
 import torch.nn as nn
 

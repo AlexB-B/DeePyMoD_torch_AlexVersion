@@ -1,13 +1,13 @@
 import torch
 import time
 
-from deepymod_torch_v2.output import Tensorboard, progress
-from deepymod_torch_v2.losses import reg_loss, mse_loss, l1_loss
-from deepymod_torch_v2.sparsity import scaling, threshold
+from deepymod_torch.output import Tensorboard, progress
+from deepymod_torch.losses import reg_loss, mse_loss, l1_loss
+from deepymod_torch.sparsity import scaling, threshold
 
 import IPython.display as dis
-from deepymod_torch_v2.output import prep_plot, update_plot
-from deepymod_torch_v2.losses import na_loss
+from deepymod_torch.output import prep_plot, update_plot
+from deepymod_torch.losses import na_loss
 
 
 def train(model, data, target, optimizer, configs):

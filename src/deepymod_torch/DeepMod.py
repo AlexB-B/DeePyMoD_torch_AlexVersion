@@ -1,9 +1,9 @@
 import torch
 import torch.nn as nn
-from deepymod_torch_v2.network import Fitting, Library
+from deepymod_torch.network import Fitting, Library
 
 import numpy as np
-import deepymod_torch_v2.training as training
+import deepymod_torch.training as training
 
 def run_deepmod(data, target, library_config, network_config={}, optim_config={}, report_config={}):
         
