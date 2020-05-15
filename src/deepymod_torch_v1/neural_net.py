@@ -5,9 +5,9 @@ import torch.nn as nn
 import torch
 from IPython import display
 
-from deepymod_torch.sparsity import scaling
+from deepymod_torch_v1.sparsity import scaling
 from torch.utils.tensorboard import SummaryWriter
-from deepymod_torch.tensorboard import custom_board
+from deepymod_torch_v1.tensorboard import custom_board
 import deepymod_torch.VE_datagen as vedg
 
 
