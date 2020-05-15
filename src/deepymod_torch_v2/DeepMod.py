@@ -23,7 +23,7 @@ def run_deepmod(data, target, library_config, network_config={}, optim_config={}
         model.network = pre_trained_network
     
     if configs.optim['mse_only_iterations']:
-        optimizer = torch.optim.Adam(model.network.parameters())
+        optimizer = torch.optim.Adam(model.network.parameters(), lr=configs.optim['lr_nn'], betas=configs.optim['betas'], amsgrad=configs.optim['amsgrad'])
         training.train_mse(model, data, target, optimizer, configs)
         prediction, time_deriv_list, sparse_theta_list = model.forward(data)[:3]
         lstsq_guess_list = [np.linalg.lstsq(sparse_theta.detach(), time_deriv.detach(), rcond=None)[0] for sparse_theta, time_deriv in zip(sparse_theta_list, time_deriv_list)]
@@ -33,7 +33,7 @@ def run_deepmod(data, target, library_config, network_config={}, optim_config={}
         model.fit.initial_guess = lstsq_guess_list
         model.fit.coeff_vector = nn.ParameterList([nn.Parameter(torch.tensor(lstsq_guess, dtype=torch.float32)) for lstsq_guess in lstsq_guess_list])
     
-    optimizer = torch.optim.Adam(({'params': model.network.parameters()}, {'params': model.fit.coeff_vector.parameters(), 'lr': configs.optim['lr_coeffs'], 'betas': configs.optim['betas_coeffs']}))
+    optimizer = torch.optim.Adam(({'params': model.network.parameters(), 'lr': configs.optim['lr_nn']}, {'params': model.fit.coeff_vector.parameters(), 'lr': configs.optim['lr_coeffs']}), betas=configs.optim['betas'], amsgrad=configs.optim['amsgrad'])
     
     training.train_deepmod(model, data, target, optimizer, configs)
         
@@ -110,13 +110,19 @@ class Configuration():
 
         if 'kappa' not in self.optim:
             self.optim['kappa'] = 1 # Even if 1, may not be used depending on library_config
-
+        
+        if 'lr_nn' not in self.optim:
+            self.optim['lr_nn'] = 0.001 # default is default for optimizer
+        
         if 'lr_coeffs' not in self.optim:
             self.optim['lr_coeffs'] = 0.001 # default is default for optimizer
 
-        if 'betas_coeffs' not in self.optim:
-            self.optim['betas_coeffs'] = (0.9, 0.999) # default is default for optimizer
+        if 'betas' not in self.optim:
+            self.optim['betas'] = (0.9, 0.999) # default is default for optimizer
 
+        if 'amsgrad' not in self.optim:
+            self.optim['amsgrad'] = False # default is default for optimizer
+            
         if 'mse_only_iterations' not in self.optim:
             self.optim['mse_only_iterations'] = None
 
