@@ -210,8 +210,24 @@ def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, spar
     return calculated_response_array
 
 
-def calculate_int_diff_equation_initial(time_array, input_lambda, coeff_array, input_type):
+def calculate_int_diff_equation_initial(time_array, input_lambda, E, eta, input_type, model):
     
+    shape = time_array.shape
+    time_array = time_array.flatten()
+    input_array = input_lambda(time_array)
+    
+    if model == 'GMM':
+        if input_type == 'Strain':
+            instant_response = input_array[0]*sum(E)
+        else: # else 'Stress'
+            instant_response = input_array[0]/sum(E)
+    else: # model = 'GKM'
+        if input_type == 'Strain':
+            instant_response = input_array[0]*E[0]
+        else: # else 'Stress'
+            instant_response = input_array[0]/E[0]
+    
+    coeff_array = np.array(VE_params.coeffs_from_model_params(E, eta, model))
     mask_array = np.arange(len(coeff_array))
     library_diff_order = len(coeff_array) // 2
     
@@ -239,7 +255,7 @@ def calculate_int_diff_equation_initial(time_array, input_lambda, coeff_array, i
         # Calculate numerical derivatives of manipualtion variable by spooling a dummy time series around t.
         input_derivs = num_derivs_single(t, input_lambda, library_diff_order)
         
-        terms_array = np.concatenate((input_derivs, U[:-1]))
+        terms_array = np.concatenate((input_derivs, U))
 
         # Multiply aligned coeff-term pairs and divide by coeff of highest order deriv of response variable.
         da_dt = np.sum(coeffs_less_dadt_array*terms_array)/response_coeffs[-1]
@@ -247,11 +263,21 @@ def calculate_int_diff_equation_initial(time_array, input_lambda, coeff_array, i
         dU_dt = list(U[1:]) + [da_dt]
         
         return dU_dt
-    
-    IVs = [0] * library_diff_order
-    calculated_response_array = integ.odeint(calc_dU_dt, IVs, time_array)[:, 0:1]
         
-    return calculated_response_array
+    IVs = [instant_response] + [0]*(library_diff_order-1)
+    # A scalable method for getting accurate IVs for higher than zeroth order derivative would reuire sympy implemented differentiation and would be (symbolic_input_expr*symbolic_relax_or_creep_expr).diff()[.diff().diff() etc] evaluated at 0.
+    calculated_response_array = integ.odeint(calc_dU_dt, IVs, time_array)[:, 0:1]
+    
+    if input_type == 'Strain':
+        strain_array = input_array
+        stress_array = calculated_response_array
+    else: # else 'Stress'
+        strain_array = calculated_response_array
+        stress_array = input_array
+        
+    strain_array, stress_array = strain_array.reshape(shape), stress_array.reshape(shape)
+        
+    return strain_array, stress_array
 
 
 def calculate_finite_difference_diff_equation(time_array, strain_array, stress_array, coeff_vector, sparsity_mask, library_diff_order, input_type):
