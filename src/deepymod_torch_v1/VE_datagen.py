@@ -4,7 +4,7 @@ import sympy as sym
 import torch
 import torch.autograd as auto
 
-import deepymod_torch.VE_params as VE_params
+import deepymod_torch_v1.VE_params as VE_params
 
 
 # Data generation using Boltzmann superposition integrals.

@@ -1,5 +1,5 @@
-from deepymod_torch.neural_net import deepmod_init, train, train_mse
-from deepymod_torch.sparsity import scaling, threshold
+from deepymod_torch_v1.neural_net import deepmod_init, train, train_mse
+from deepymod_torch_v1.sparsity import scaling, threshold
 
 import numpy as np
 import torch
