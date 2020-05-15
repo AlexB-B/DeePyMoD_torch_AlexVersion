@@ -21,6 +21,8 @@ class Fitting(nn.Module):
             tensor_list = [abs(tensor) for tensor in tensor_list]
         self.coeff_vector = nn.ParameterList([torch.nn.Parameter(tensor) for tensor in tensor_list])
         self.sparsity_mask = [torch.arange(n_terms) for _ in torch.arange(n_equations)]
+        self.coeff_vector_history = []
+        self.sparsity_mask_history = []
 
     def forward(self, input):
         sparse_theta = self.apply_mask(input)
