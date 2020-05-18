@@ -7,7 +7,7 @@ from deepymod_torch.sparsity import scaling, threshold
 
 import IPython.display as dis
 from deepymod_torch.output import prep_plot, update_plot
-from deepymod_torch.losses import na_loss
+from deepymod_torch.losses import sign_loss
 
 
 def train(model, data, target, optimizer, configs):
@@ -34,8 +34,8 @@ def train(model, data, target, optimizer, configs):
         loss_reg = reg_loss(time_deriv_list, sparse_theta_list, coeff_vector_list)
         loss_mse = mse_loss(prediction, target)
         loss_l1 = l1_loss(coeff_vector_scaled_list, configs.optim['l1'])
-        loss_na = na_loss(coeff_vector_scaled_list, configs.optim['kappa'])
-        loss = torch.sum(loss_reg) + torch.sum(loss_mse) + torch.sum(loss_l1) + torch.sum(loss_na)
+        loss_sign = sign_loss(coeff_vector_scaled_list, configs)
+        loss = torch.sum(loss_reg) + torch.sum(loss_mse) + torch.sum(loss_l1) + torch.sum(loss_sign)
         
         # Writing, first live progress, then tensorboard.
         if iteration % print_interval == 0:
@@ -43,14 +43,14 @@ def train(model, data, target, optimizer, configs):
             if plot:
                 update_plot(axes, data, prediction)
             
-            print('| Iteration | Progress | Time remaining |     Cost |      MSE |      Reg |       L1 |      NA |')
-            progress(iteration.item(), start_time, max_iterations, loss.item(), torch.sum(loss_mse).item(), torch.sum(loss_reg).item(), torch.sum(loss_l1).item(), torch.sum(loss_na).item())
+            print('| Iteration | Progress | Time remaining |     Cost |      MSE |      Reg |       L1 |    Sign |')
+            progress(iteration.item(), start_time, max_iterations, loss.item(), torch.sum(loss_mse).item(), torch.sum(loss_reg).item(), torch.sum(loss_l1).item(), torch.sum(loss_sign).item())
             print()
             print(list(coeff_vector_list))
 #             print(sparsity_mask_list)
         
         if iteration % 100 == 0:
-            board.write(iteration, loss, loss_mse, loss_reg, loss_l1, loss_na, coeff_vector_list, coeff_vector_scaled_list)
+            board.write(iteration, loss, loss_mse, loss_reg, loss_l1, loss_sign, coeff_vector_list, coeff_vector_scaled_list)
             
         # Optimizer step
         optimizer.zero_grad()
@@ -88,7 +88,7 @@ def train_mse(model, data, target, optimizer, configs):
             if plot:
                 update_plot(axes, data, prediction)
                 
-            print('| Iteration | Progress | Time remaining |     Cost |      MSE |      Reg |       L1 |      NA |')
+            print('| Iteration | Progress | Time remaining |     Cost |      MSE |      Reg |       L1 |    Sign |')
             progress(iteration.item(), start_time, max_iterations, loss.item(), torch.sum(loss_mse).item(), 0, 0, 0)
         
         if iteration % 100 == 0:

@@ -17,8 +17,8 @@ class Fitting(nn.Module):
     def __init__(self, n_equations, n_terms, library_config):
         super().__init__()
         tensor_list = [torch.rand((n_terms, 1), dtype=torch.float32) for _ in torch.arange(n_equations)]
-        if library_config.get('coeff_sign') == 'positive':
-            tensor_list = [abs(tensor) for tensor in tensor_list]
+        if 'coeff_sign' in library_config:
+            tensor_list = [library_config['coeff_sign']*abs(tensor) for tensor in tensor_list]
         self.coeff_vector = nn.ParameterList([torch.nn.Parameter(tensor) for tensor in tensor_list])
         self.sparsity_mask = [torch.arange(n_terms) for _ in torch.arange(n_equations)]
         self.coeff_vector_history = []

@@ -13,7 +13,7 @@ class Tensorboard():
         self.writer = SummaryWriter()
         self.writer.add_custom_scalars(custom_board(number_of_tar_vars, number_of_terms_list))
 
-    def write(self, iteration, loss, loss_mse, loss_reg, loss_l1, loss_na, coeff_vector_list, coeff_vector_scaled_list):
+    def write(self, iteration, loss, loss_mse, loss_reg, loss_l1, loss_sign, coeff_vector_list, coeff_vector_scaled_list):
         # Logs losses, costs and coeff vectors.
         self.writer.add_scalar('Total loss', loss, iteration)
         for idx in range(len(loss_mse)):
@@ -22,7 +22,7 @@ class Tensorboard():
         for idx in range(len(loss_reg)):
             self.writer.add_scalar('Regression '+str(idx), loss_reg[idx], iteration)
             self.writer.add_scalar('L1 '+str(idx), loss_l1[idx], iteration)
-            self.writer.add_scalar('NA '+str(idx), loss_na[idx], iteration)
+            self.writer.add_scalar('Sign '+str(idx), loss_sign[idx], iteration)
             for element_idx, element in enumerate(torch.unbind(coeff_vector_list[idx])): # Tensorboard doesnt have vectors, so we unbind and plot them in together in custom board
                 self.writer.add_scalar('coeff ' + str(idx) + ' ' + str(element_idx), element, iteration)
             for element_idx, element in enumerate(torch.unbind(coeff_vector_scaled_list[idx])):
@@ -38,7 +38,7 @@ def custom_board(number_of_tar_vars, number_of_terms_list):
     custom_board = {'Costs': {'MSE': ['Multiline', ['MSE_' + str(idx) for idx in np.arange(number_of_tar_vars)]],
                               'Regression': ['Multiline', ['Regression_' + str(idx) for idx in np.arange(number_of_eqs)]],
                               'L1': ['Multiline', ['L1_' + str(idx) for idx in np.arange(number_of_eqs)]],
-                              'NA': ['Multiline', ['NA_' + str(idx) for idx in np.arange(number_of_eqs)]]},
+                              'Sign': ['Multiline', ['Sign_' + str(idx) for idx in np.arange(number_of_eqs)]]},
                     'Coefficients': {},
                     'Scaled coefficients': {}}
 
@@ -49,12 +49,12 @@ def custom_board(number_of_tar_vars, number_of_terms_list):
 
     return custom_board
 
-def progress(iteration, start_time, max_iteration, cost, MSE, PI, L1, NA):
+def progress(iteration, start_time, max_iteration, cost, MSE, PI, L1, Sign):
     '''Prints and updates progress of training cycle in command line.'''
     percent = iteration/max_iteration * 100
     elapsed_time = time.time() - start_time
     time_left = elapsed_time * (max_iteration/iteration - 1) if iteration != 0 else 0
-    sys.stdout.write(f"\r  {iteration:>9}   {percent:>7.2f}%   {time_left:>13.0f}s   {cost:>8.2e}   {MSE:>8.2e}   {PI:>8.2e}   {L1:>8.2e}   {NA:>8.2e} ")
+    sys.stdout.write(f"\r  {iteration:>9}   {percent:>7.2f}%   {time_left:>13.0f}s   {cost:>8.2e}   {MSE:>8.2e}   {PI:>8.2e}   {L1:>8.2e}   {Sign:>8.2e} ")
     sys.stdout.flush()
 
     

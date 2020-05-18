@@ -8,10 +8,7 @@ import deepymod_torch.training as training
 def run_deepmod(data, target, library_config, network_config={}, optim_config={}, report_config={}):
         
     configs = Configuration(library_config, network_config, optim_config, report_config)
-    
-    if configs.library.get('coeff_sign') != 'positive':
-        configs.optim['kappa'] = 0 # library controlled optimisation condition
-    
+        
     ind_vars = data.shape[1]
     tar_vars = target.shape[1]
     hidden_list = configs.network['layers']*[configs.network['hidden_dim']]
@@ -109,7 +106,9 @@ class Configuration():
             self.optim['l1'] = 10**-5
 
         if 'kappa' not in self.optim:
-            self.optim['kappa'] = 1 # Even if 1, may not be used depending on library_config
+            self.optim['kappa'] = 0 # Not used by default
+            if 'coeff_sign' in self.library:
+                self.optim['kappa'] = 1
         
         if 'lr_nn' not in self.optim:
             self.optim['lr_nn'] = 0.001 # default is default for optimizer
@@ -143,3 +142,7 @@ class Configuration():
             
         if 'plot' not in self.report:
             self.report['plot'] = False
+            
+        if 'coeff_sign' in self.library:
+            convert_dict = {'positive': 1, 'negative': -1}
+            self.library['coeff_sign'] = convert_dict[self.library['coeff_sign']]

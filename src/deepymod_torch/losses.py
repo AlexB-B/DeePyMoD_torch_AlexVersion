@@ -19,9 +19,11 @@ def l1_loss(scaled_coeff_vector_list, l1):
     loss = torch.stack([torch.sum(torch.abs(coeff_vector)) for coeff_vector in scaled_coeff_vector_list])
     return l1 * loss
     
-def na_loss(scaled_coeff_vector_list, kappa):
+def sign_loss(scaled_coeff_vector_list, configs):
+    kappa = configs.optim['kappa']
+    sign = configs.library.get('coeff_sign', 1)
     '''Loss functions for the negative aversion loss on the coefficients. Calculates loss for each term in list.'''
-    loss = torch.stack([torch.sum(nn.functional.relu(-coeff_vector))**2 for coeff_vector in scaled_coeff_vector_list])        
+    loss = torch.stack([torch.sum(nn.functional.relu(-sign*coeff_vector))**2 for coeff_vector in scaled_coeff_vector_list])        
     return kappa * loss
 
 
