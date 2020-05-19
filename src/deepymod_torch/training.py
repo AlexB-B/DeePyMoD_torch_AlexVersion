@@ -43,7 +43,7 @@ def train(model, data, target, optimizer, configs):
             if plot:
                 update_plot(axes, data, prediction)
             
-            print('| Iteration | Progress | Time remaining |     Cost |      MSE |      Reg |       L1 |    Sign |')
+            print('| Iteration | Progress | Time remaining |     Cost |      MSE |      Reg |       L1 |     Sign |')
             progress(iteration.item(), start_time, max_iterations, loss.item(), torch.sum(loss_mse).item(), torch.sum(loss_reg).item(), torch.sum(loss_l1).item(), torch.sum(loss_sign).item())
             print()
             print(list(coeff_vector_list))
@@ -88,7 +88,7 @@ def train_mse(model, data, target, optimizer, configs):
             if plot:
                 update_plot(axes, data, prediction)
                 
-            print('| Iteration | Progress | Time remaining |     Cost |      MSE |      Reg |       L1 |    Sign |')
+            print('| Iteration | Progress | Time remaining |     Cost |      MSE |      Reg |       L1 |     Sign |')
             progress(iteration.item(), start_time, max_iterations, loss.item(), torch.sum(loss_mse).item(), 0, 0, 0)
         
         if iteration % 100 == 0:
