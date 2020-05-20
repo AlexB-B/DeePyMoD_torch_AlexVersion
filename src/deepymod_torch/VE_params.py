@@ -51,24 +51,22 @@ def coeffs_from_model_params(E_mod_list, visc_list, model, print_expressions=Fal
 
 def kelvin_coeff_expressions(order):
         
-    eps, sig = sym.symbols('epsilon,sigma', real=True)
     E_0 = sym.symbols('E^K_0', real=True, negative=False)
     
     #Create and organise Kelvin general equation
     summation, model_params_list = kelvin_sym_sum(order)
     model_params_list = [E_0] + model_params_list
-    RHS = (1/E_0 + summation)*sig
+    RHS = 1/E_0 + summation
     RHS = RHS.together()
-    stress_side, denom = sym.fraction(RHS)
-    strain_side = eps*denom
+    stress_side, strain_side = sym.fraction(RHS)
     strain_side, stress_side = strain_side.expand(), stress_side.expand() # required for .coeff() to work.
     
     dt = sym.symbols('dt')
     
     # coeff of strain_t NOT 1.
     # Strain coeff expressions always first by convention.
-    coeff_expressions_list = [strain_side.coeff(eps, 1).coeff(dt, strain_order) for strain_order in range(order+1)]
-    coeff_expressions_list += [stress_side.coeff(sig, 1).coeff(dt, stress_order) for stress_order in range(order+1)]
+    coeff_expressions_list = [strain_side.coeff(dt, strain_order) for strain_order in range(order+1)]
+    coeff_expressions_list += [stress_side.coeff(dt, stress_order) for stress_order in range(order+1)]
     
     # Fix coeffs to a reference version of equation, where the coeff of strain_t is 1.
     coeff_expressions_list = [sym.simplify(coeff_expression/coeff_expressions_list[1]) for i, coeff_expression in enumerate(coeff_expressions_list) if i != 1]
@@ -96,24 +94,22 @@ def kelvin_sym_sum(order):
 
 def maxwell_coeff_expressions(order):
         
-    eps, sig = sym.symbols('epsilon,sigma', real=True)
     E_0 = sym.symbols('E^M_0', real=True, negative=False)
     
     #Create and organise Kelvin general equation
     summation, model_params_list = maxwell_sym_sum(order)
     model_params_list = [E_0] + model_params_list
-    RHS = (E_0 + summation)*eps
+    RHS = E_0 + summation
     RHS = RHS.together()
-    strain_side, denom = sym.fraction(RHS)
-    stress_side = sig*denom
+    strain_side, stress_side = sym.fraction(RHS)
     strain_side, stress_side = strain_side.expand(), stress_side.expand() # required for .coeff() to work.
 
     dt = sym.symbols('dt')
     
     # coeff of strain_t NOT 1.
     # Strain coeff expressions always first by convention.
-    coeff_expressions_list = [strain_side.coeff(eps, 1).coeff(dt, strain_order) for strain_order in range(order+1)]
-    coeff_expressions_list += [stress_side.coeff(sig, 1).coeff(dt, stress_order) for stress_order in range(order+1)]
+    coeff_expressions_list = [strain_side.coeff(dt, strain_order) for strain_order in range(order+1)]
+    coeff_expressions_list += [stress_side.coeff(dt, stress_order) for stress_order in range(order+1)]
     
     # Fix coeffs to a reference version of equation, where the coeff of strain_t is 1.
     coeff_expressions_list = [sym.simplify(coeff_expression/coeff_expressions_list[1]) for i, coeff_expression in enumerate(coeff_expressions_list) if i != 1]
