@@ -144,5 +144,5 @@ class Configuration():
             self.report['plot'] = False
             
         if 'coeff_sign' in self.library:
-            convert_dict = {'positive': 1, 'negative': -1}
+            convert_dict = {'positive': 1, 1: 1, 'negative': -1, -1: -1}
             self.library['coeff_sign'] = convert_dict[self.library['coeff_sign']]
