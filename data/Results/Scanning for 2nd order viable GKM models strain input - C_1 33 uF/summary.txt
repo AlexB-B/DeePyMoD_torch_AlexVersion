@@ -1,0 +1,1 @@
+None work. The higher param vals of eta_2 work better, sometimes getting quite close, but in particular the highest derivative of stress is off.
