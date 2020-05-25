@@ -21,21 +21,23 @@ def run_deepmod(data, target, library_config, network_config={}, optim_config={}
     
     if configs.optim['mse_only_iterations']:
         optimizer = torch.optim.Adam(model.network.parameters(), lr=configs.optim['lr_nn'], betas=configs.optim['betas'], amsgrad=configs.optim['amsgrad'])
-        training.train_mse(model, data, target, optimizer, configs)
+        training.train_mse(model, data, target, optimizer)
         prediction, time_deriv_list, sparse_theta_list = model.forward(data)[:3]
-        lstsq_guess_list = [np.linalg.lstsq(sparse_theta.detach(), time_deriv.detach(), rcond=None)[0] for sparse_theta, time_deriv in zip(sparse_theta_list, time_deriv_list)]
     
     model.fit.initial_guess = None
     if configs.optim['use_lstsq_approx']:
+        lstsq_guess_list = [np.linalg.lstsq(sparse_theta.detach(), time_deriv.detach(), rcond=None)[0] for sparse_theta, time_deriv in zip(sparse_theta_list, time_deriv_list)]
         model.fit.initial_guess = lstsq_guess_list
         model.fit.coeff_vector = nn.ParameterList([nn.Parameter(torch.tensor(lstsq_guess, dtype=torch.float32)) for lstsq_guess in lstsq_guess_list])
     
     optimizer = torch.optim.Adam(({'params': model.network.parameters(), 'lr': configs.optim['lr_nn']}, {'params': model.fit.coeff_vector.parameters(), 'lr': configs.optim['lr_coeffs']}), betas=configs.optim['betas'], amsgrad=configs.optim['amsgrad'])
     
-    training.train_deepmod(model, data, target, optimizer, configs)
-        
-    return model
+    training.train_deepmod(model, data, target, optimizer)
     
+    model.optimizer = optimizer
+    
+    return model
+
     
 class DeepMod(nn.Module):
     ''' Class based interface for deepmod.'''

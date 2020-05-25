@@ -10,8 +10,9 @@ from deepymod_torch.output import prep_plot, update_plot
 from deepymod_torch.losses import sign_loss
 
 
-def train(model, data, target, optimizer, configs):
+def train(model, data, target, optimizer):
     '''Trains the deepmod model with MSE, regression and l1 cost function. Updates model in-place.'''
+    configs = model.configs
     start_time = time.time()
     number_of_tar_vars = target.shape[1]
     number_of_terms_list = [coeff_vec.shape[0] for coeff_vec in model(data)[3]]
@@ -58,8 +59,9 @@ def train(model, data, target, optimizer, configs):
         optimizer.step()
     board.close()
 
-def train_mse(model, data, target, optimizer, configs):
+def train_mse(model, data, target, optimizer):
     '''Trains the deepmod model only on the MSE. Updates model in-place.'''
+    configs = model.configs
     start_time = time.time()
     number_of_tar_vars = target.shape[1]
     number_of_terms_list = [coeff_vec.shape[0] for coeff_vec in model(data)[3]]
@@ -100,12 +102,15 @@ def train_mse(model, data, target, optimizer, configs):
         optimizer.step()
     board.close()
 
-def train_deepmod(model, data, target, optimizer, configs):
+def train_deepmod(model, data, target, optimizer):
     '''Performs full deepmod cycle: trains model, thresholds and trains again for unbiased estimate. Updates model in-place.'''
+    
+    configs = model.configs
+    external_values = configs.optim['l1'], configs.optim['max_iterations']
     
     if not configs.optim['PINN']:
         # Train first cycle and get prediction
-        train(model, data, target, optimizer, configs)
+        train(model, data, target, optimizer)
         prediction, time_deriv_list, sparse_theta_list, coeff_vector_list = model(data)
 
         model.fit.coeff_vector_history += [model.fit.coeff_vector]
@@ -126,9 +131,8 @@ def train_deepmod(model, data, target, optimizer, configs):
         configs.optim['max_iterations'] = configs.optim['final_run_iterations']
     
     #print() #empty line for correct printing
-    external_values = configs.optim['l1'], configs.optim['max_iterations']
     configs.optim['l1'] = 0.0
-    train(model, data, target, optimizer, configs)
+    train(model, data, target, optimizer)
     configs.optim['l1'], configs.optim['max_iterations'] = external_values
     
     model.fit.coeff_vector_history += [model.fit.coeff_vector]
