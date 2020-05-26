@@ -10,9 +10,11 @@ from deepymod_torch.output import prep_plot, update_plot
 from deepymod_torch.losses import sign_loss
 
 
-def train(model, data, target, optimizer):
+def train(model, data, target, optimizer, *args):
     '''Trains the deepmod model with MSE, regression and l1 cost function. Updates model in-place.'''
     configs = model.configs
+    if len(args) > 0: # backwards compatibility
+        configs.optim['max_iterations'], configs.optim['l1'] = args[0], args[1]['l1']
     start_time = time.time()
     number_of_tar_vars = target.shape[1]
     number_of_terms_list = [coeff_vec.shape[0] for coeff_vec in model(data)[3]]
@@ -59,9 +61,11 @@ def train(model, data, target, optimizer):
         optimizer.step()
     board.close()
 
-def train_mse(model, data, target, optimizer):
+def train_mse(model, data, target, optimizer, *args):
     '''Trains the deepmod model only on the MSE. Updates model in-place.'''
     configs = model.configs
+    if len(args) > 0: # backwards compatibility
+        configs.optim['max_iterations'] = args[0]
     start_time = time.time()
     number_of_tar_vars = target.shape[1]
     number_of_terms_list = [coeff_vec.shape[0] for coeff_vec in model(data)[3]]
@@ -102,10 +106,13 @@ def train_mse(model, data, target, optimizer):
         optimizer.step()
     board.close()
 
-def train_deepmod(model, data, target, optimizer):
+def train_deepmod(model, data, target, optimizer, *args):
     '''Performs full deepmod cycle: trains model, thresholds and trains again for unbiased estimate. Updates model in-place.'''
     
     configs = model.configs
+    if len(args) > 0: # backwards compatibility
+        configs.optim['max_iterations'], configs.optim['final_run_iterations'] = args[0], args[0]
+        configs.optim['l1'] = args[1]['l1']
     external_values = configs.optim['l1'], configs.optim['max_iterations']
     
     if not configs.optim['PINN']:

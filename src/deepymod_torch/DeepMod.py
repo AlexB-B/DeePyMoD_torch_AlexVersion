@@ -41,12 +41,14 @@ def run_deepmod(data, target, library_config, network_config={}, optim_config={}
     
 class DeepMod(nn.Module):
     ''' Class based interface for deepmod.'''
-    def __init__(self, n_in, hidden_dims, n_out, library_function, configs):
+    def __init__(self, n_in, hidden_dims, n_out, library_function, configs=None, library_args=None):
         super().__init__()
-        self.network = self.build_network(n_in, hidden_dims, n_out)
-        self.library = Library(library_function, configs.library)
-        self.fit = self.build_fit_layer(n_in, configs.library)
         self.configs = configs
+        if library_args: # backwards compatibility
+            self.configs = Configuration(library_args)
+        self.network = self.build_network(n_in, hidden_dims, n_out)
+        self.library = Library(library_function, self.configs.library)
+        self.fit = self.build_fit_layer(n_in, self.configs.library)
         
     def forward(self, input):
         prediction = self.network(input)
