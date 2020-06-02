@@ -12,13 +12,23 @@ def model_params_from_coeffs(coeff_vector, model, print_expressions=False):
     else: # model == 'GKM'
         coeff_expression_list, model_params_mask_list = kelvin_coeff_expressions(order)
     
+    # Treat problem to be more amenable to SymPy by factoring out denominator, alpha, and casting as extra expr.
+    alpha = sym.symbols('alpha', real=True, positive=True)
+    alpha_expr = sym.simplify(coeff_expression_list[1])
+    coeff_expression_list = [sym.simplify(coeff_expression) for i, coeff_expression in enumerate(coeff_expression_list) if i != 1]
+    
     if print_expressions:
-        coeff_equations_list = [sym.Eq(coeff_expression, coeff_value) for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
+        coeff_equations_list = [sym.Eq(coeff_expression, coeff_value*alpha) for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
+        coeff_equations_list += [sym.Eq(alpha_expr, alpha)]
         dis.display(*coeff_equations_list)
     
-    coeff_equations_list = [coeff_expression - coeff_value for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
+    coeff_equations_list = [coeff_expression - coeff_value*alpha for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
+    coeff_equations_list += [alpha_expr - alpha]
     
-    model_params_value_list = sym.solve(coeff_equations_list, model_params_mask_list)
+    model_params_value_list = sym.solve(coeff_equations_list, model_params_mask_list + [alpha])
+    
+    # No need to report value of alpha
+    model_params_value_list = [model_params_values[:-1] for model_params_values in model_params_value_list]
     
     if len(model_params_value_list) == 0:
         model_params_value_list = [()] # Preserve structure for indexing consistency
@@ -39,6 +49,8 @@ def coeffs_from_model_params(E_mod_list, visc_list, model, print_expressions=Fal
     else: # model == 'GKM'
         coeff_expression_list, model_params_mask_list = kelvin_coeff_expressions(order)
     
+    coeff_expression_list = [sym.simplify(coeff_expression/coeff_expression_list[1]) for i, coeff_expression in enumerate(coeff_expression_list) if i != 1]
+    
     if print_expressions:
         dis.display(*coeff_expression_list)
     
@@ -51,7 +63,7 @@ def coeffs_from_model_params(E_mod_list, visc_list, model, print_expressions=Fal
 
 def kelvin_coeff_expressions(order):
         
-    E_0 = sym.symbols('E^K_0', real=True, negative=False)
+    E_0 = sym.symbols('E^K_0', real=True, positive=True)
     
     #Create and organise Kelvin general equation
     summation, model_params_list = kelvin_sym_sum(order)
@@ -68,16 +80,13 @@ def kelvin_coeff_expressions(order):
     coeff_expressions_list = [strain_side.coeff(dt, strain_order) for strain_order in range(order+1)]
     coeff_expressions_list += [stress_side.coeff(dt, stress_order) for stress_order in range(order+1)]
     
-    # Fix coeffs to a reference version of equation, where the coeff of strain_t is 1.
-    coeff_expressions_list = [sym.simplify(coeff_expression/coeff_expressions_list[1]) for i, coeff_expression in enumerate(coeff_expressions_list) if i != 1]
-    
     return coeff_expressions_list, model_params_list
 
 
 def kelvin_sym_sum(order):
     
-    E_Syms = [sym.symbols('E^K_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
-    Eta_Syms = [sym.symbols('eta^K_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
+    E_Syms = [sym.symbols('E^K_'+str(Branch_Index), real=True, positive=True) for Branch_Index in range(1, order+1)]
+    Eta_Syms = [sym.symbols('eta^K_'+str(Branch_Index), real=True, positive=True) for Branch_Index in range(1, order+1)]
     
     all_syms = E_Syms + Eta_Syms
     
@@ -94,7 +103,7 @@ def kelvin_sym_sum(order):
 
 def maxwell_coeff_expressions(order):
         
-    E_0 = sym.symbols('E^M_0', real=True, negative=False)
+    E_0 = sym.symbols('E^M_0', real=True, positive=True)
     
     #Create and organise Kelvin general equation
     summation, model_params_list = maxwell_sym_sum(order)
@@ -111,16 +120,13 @@ def maxwell_coeff_expressions(order):
     coeff_expressions_list = [strain_side.coeff(dt, strain_order) for strain_order in range(order+1)]
     coeff_expressions_list += [stress_side.coeff(dt, stress_order) for stress_order in range(order+1)]
     
-    # Fix coeffs to a reference version of equation, where the coeff of strain_t is 1.
-    coeff_expressions_list = [sym.simplify(coeff_expression/coeff_expressions_list[1]) for i, coeff_expression in enumerate(coeff_expressions_list) if i != 1]
-    
     return coeff_expressions_list, model_params_list
 
 
 def maxwell_sym_sum(order):
     
-    E_Syms = [sym.symbols('E^M_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
-    Eta_Syms = [sym.symbols('eta^M_'+str(Branch_Index), real=True, negative=False) for Branch_Index in range(1, order+1)]
+    E_Syms = [sym.symbols('E^M_'+str(Branch_Index), real=True, positive=True) for Branch_Index in range(1, order+1)]
+    Eta_Syms = [sym.symbols('eta^M_'+str(Branch_Index), real=True, positive=True) for Branch_Index in range(1, order+1)]
     
     all_syms = E_Syms + Eta_Syms
     
@@ -151,13 +157,13 @@ def convert_between_models(E_mod_list, visc_list, origin_model, print_expression
     if print_expressions:
         print(f'{dest_model} parameters from universal coefficients:')
     
-    dest_model_value_list = model_params_from_coeffs(coeff_value_list, dest_model, print_expressions=print_expressions)[0]
+    dest_model_values = model_params_from_coeffs(coeff_value_list, dest_model, print_expressions=print_expressions)[0][0]
     
-    # Absurd line for converting sympy objects back. [0] needed due to format of dest_model_value_list.
-    params_result = [float(param) for param in dest_model_value_list[0]]
-    E_mod_list_result = params_result[:len(E_mod_list)]
-    visc_list_result = params_result[len(E_mod_list):]
+    E_mod_list_result = dest_model_values[:len(E_mod_list)]
+    visc_list_result = dest_model_values[len(E_mod_list):]
     
+    # Returned results are sympy objects which may cause issues.
+    # Convert to standard floats if possible. Will not be possible if symbols remain.
     return E_mod_list_result, visc_list_result
 
 
