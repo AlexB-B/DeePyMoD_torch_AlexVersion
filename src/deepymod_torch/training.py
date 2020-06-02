@@ -27,6 +27,8 @@ def train(model, data, target, optimizer, *args):
     if plot: # only works for ODEs (one independant variable)
         axes = prep_plot(data, target)
     
+    print(optimizer.param_groups)
+    
     # Training
     for iteration in torch.arange(0, max_iterations + 1):
         # Calculating prediction and library and scaling
@@ -105,7 +107,7 @@ def train_mse(model, data, target, optimizer, *args):
         loss.backward()
         optimizer.step()
     board.close()
-
+    
 def train_deepmod(model, data, target, optimizer, *args):
     '''Performs full deepmod cycle: trains model, thresholds and trains again for unbiased estimate. Updates model in-place.'''
     
@@ -128,16 +130,13 @@ def train_deepmod(model, data, target, optimizer, *args):
         model.fit.sparsity_mask = sparsity_mask_list
         model.fit.coeff_vector = torch.nn.ParameterList(sparse_coeff_vector_list)
 
-        #Resetting optimizer for different shapes, train without l1 
-    #     optimizer.param_groups[0]['params'] = model.parameters() # packs nn and coeff_vector into same optimiser group ...
-        # but doesn't remove now duplicate coeff_vector params? I would propose to replace with the below...
-        optimizer.param_groups[1]['params'] = model.fit.coeff_vector.parameters()
-        # or add line ...
-        # del optimizer.param_groups[1]
+        # Alter optimizer for sparse coeff vectors
+        optimizer.param_groups[1]['params'] = list(model.fit.coeff_vector.parameters())
         
         configs.optim['max_iterations'] = configs.optim['final_run_iterations']
     
-    #print() #empty line for correct printing
+    # Train without l1
+    print() #empty line for correct printing
     configs.optim['l1'] = 0.0
     train(model, data, target, optimizer)
     configs.optim['l1'], configs.optim['max_iterations'] = external_values
