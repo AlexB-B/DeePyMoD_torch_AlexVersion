@@ -12,20 +12,22 @@ def model_params_from_coeffs(coeff_vector, model, print_expressions=False):
     else: # model == 'GKM'
         coeff_expression_list, model_params_mask_list = kelvin_coeff_expressions(order)
     
-    # Treat problem to be more amenable to SymPy by factoring out denominator, alpha, and casting as extra expr.
-    alpha = sym.symbols('alpha', real=True, positive=True)
-    alpha_expr = sym.simplify(coeff_expression_list[1])
+    # Treat problem to be more amenable to SymPy by
+    # ... extracting the common factor, the coeff of strain_t in natural form (not fixed to 1) ...
+    # ... and solving as additional equation.
+    natural_strain_t_coeff_sym = sym.symbols('c^n_{\epsilon_t}', real=True, positive=True)
+    natural_strain_t_coeff_expr = sym.simplify(coeff_expression_list[1])
     coeff_expression_list = [sym.simplify(coeff_expression) for i, coeff_expression in enumerate(coeff_expression_list) if i != 1]
     
     if print_expressions:
-        coeff_equations_list = [sym.Eq(coeff_expression, coeff_value*alpha) for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
-        coeff_equations_list += [sym.Eq(alpha_expr, alpha)]
+        coeff_equations_list = [sym.Eq(coeff_expression, coeff_value*natural_strain_t_coeff_sym) for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
+        coeff_equations_list += [sym.Eq(natural_strain_t_coeff_expr, natural_strain_t_coeff_sym)]
         dis.display(*coeff_equations_list)
     
-    coeff_equations_list = [coeff_expression - coeff_value*alpha for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
-    coeff_equations_list += [alpha_expr - alpha]
+    coeff_equations_list = [coeff_expression - coeff_value*natural_strain_t_coeff_sym for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
+    coeff_equations_list += [natural_strain_t_coeff_expr - natural_strain_t_coeff_sym]
     
-    model_params_value_list = sym.solve(coeff_equations_list, model_params_mask_list + [alpha])
+    model_params_value_list = sym.solve(coeff_equations_list, model_params_mask_list + [natural_strain_t_coeff_sym])
     
     # No need to report value of alpha
     model_params_value_list = [model_params_values[:-1] for model_params_values in model_params_value_list]
@@ -49,6 +51,7 @@ def coeffs_from_model_params(E_mod_list, visc_list, model, print_expressions=Fal
     else: # model == 'GKM'
         coeff_expression_list, model_params_mask_list = kelvin_coeff_expressions(order)
     
+    # Fix coeff of first derivative of strain to 1
     coeff_expression_list = [sym.simplify(coeff_expression/coeff_expression_list[1]) for i, coeff_expression in enumerate(coeff_expression_list) if i != 1]
     
     if print_expressions:
