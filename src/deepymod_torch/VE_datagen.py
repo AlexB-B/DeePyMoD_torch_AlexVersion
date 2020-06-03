@@ -413,8 +413,8 @@ def align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order):
         strain_coeffs = [1] + strain_coeffs
     
     # Arrays in, arrays out.
-    strain_coeffs_mask = np.array(strain_coeffs), np.array(strain_mask)
-    stress_coeffs_mask = np.array(stress_coeffs), np.array(stress_mask)
+    strain_coeffs_mask = np.array(strain_coeffs), np.array(strain_mask, dtype=int)
+    stress_coeffs_mask = np.array(stress_coeffs), np.array(stress_mask, dtype=int)
     
     return strain_coeffs_mask, stress_coeffs_mask
 
