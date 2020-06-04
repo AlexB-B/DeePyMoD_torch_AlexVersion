@@ -60,7 +60,7 @@ with open('DG_info_list.txt', 'r') as file:
 dg_data = np.loadtxt('DG_series_data.csv', delimiter=',')
 fit_data = np.loadtxt('NN_series_data.csv', delimiter=',')
 full_pred = np.loadtxt('full_prediction.csv', delimiter=',')
-expected_coeffs = np.loadtxt('expected_coeffs.csv', delimiter=',').flatten()
+expected_coeffs = np.loadtxt('expected_coeffs.csv', delimiter=',')
 final_coeffs_data = np.loadtxt('final_coeffs_data.csv', delimiter=',')
 
 # Extract Tensorboard data
@@ -209,7 +209,7 @@ plt.savefig(save_path+'coeff_evolution.png', bbox_inches='tight')
 
 
 # DV plots
-expected_coeffs = list(expected_coeffs)
+expected_coeffs = list(expected_coeffs.flatten())
 
 input_type = library_config['input_type']
 
