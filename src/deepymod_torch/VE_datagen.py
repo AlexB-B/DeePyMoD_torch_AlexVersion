@@ -203,9 +203,9 @@ def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, spar
     
     reduced_time_array = time_array[start_index:].flatten()
     
-    calculated_response_array = integ.odeint(calc_dU_dt, IVs, reduced_time_array)[:, 0:1]
+    calculated_response_array = integ.odeint(calc_dU_dt, IVs, reduced_time_array)[:, 0]
     
-    calculated_response_array = np.concatenate((calculated_response_array_initial, calculated_response_array))
+    calculated_response_array = np.concatenate((calculated_response_array_initial, calculated_response_array)).reshape(-1, 1)
     
     return calculated_response_array
 
@@ -309,7 +309,7 @@ def calculate_finite_difference_diff_equation(time_array, strain_array, stress_a
     
     # DETERMINE EXPRESSION TO RETURN RESPONSE
     # Subsitute time step symbol for value. This also simplifies expressions to sums of coeff*unique_symbol terms.
-    delta_t = time_array[1] - time_array[0]
+    delta_t = float(time_array[1] - time_array[0])
     strain_expr = strain_expr.subs(delta, delta_t)
     stress_expr = stress_expr.subs(delta, delta_t)
     
@@ -343,7 +343,7 @@ def calculate_finite_difference_diff_equation(time_array, strain_array, stress_a
     initial_index = max_remaining_diff_order
     flat_input_array = input_array.flatten()
     calculated_response_array = response_array[:initial_index].flatten()
-    
+        
     # Evaluate for each time point beyond initial values.
     for t_index in range(initial_index, len(time_array)):
         # Dictionaries created mapping symbol to stress and strain values at correct historic time point.
