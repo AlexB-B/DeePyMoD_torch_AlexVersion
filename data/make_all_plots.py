@@ -280,7 +280,7 @@ if number_graphs == 1:
     ax.set_title(response_type+' response reformulation\nfrom scaled manipulation profile\nand discovered coefficients')
     ax.set_xlabel('Scaled time')
     ax.plot(scaled_time_array, target_array, label='Target', color='blue')
-    ax.plot(scaled_time_array, response_recalc.flatten(), label='Reformulation', color='orange')
+    ax.plot(scaled_time_array, response_recalc.flatten(), label='Reformulation', color='orange', linestyle='--')
     ax.legend()
     
     plt.tight_layout()
