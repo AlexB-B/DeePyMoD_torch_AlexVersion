@@ -1,4 +1,5 @@
-# Use command %run -n "/home/working/data/make_all_plots.py" etc using appropriate number of ../
+# Use command %run -i "/home/working/data/make_all_plots.py"
+# or %run -i "/home/alex/DeePyMoD_torch_AlexVersion/data/make_all_plots.py"
 # Run from console with cwd as folder containing csv files of interest etc.
 
 import os
@@ -13,8 +14,12 @@ import deepymod_torch.VE_datagen as VE_datagen
 
 # Directories
 cwd = os.getcwd()
-main_train_path = input('Name of folder containing main training tensorboard')
-post_thresh_train_path = input('Name of folder containing post threshold training tensorboard')
+try: # Check if variables already defined in ipython console (requires "-i" flag)
+    main_train_path
+    post_thresh_train_path
+except NameError:
+    main_train_path = input('Name of folder containing main training tensorboard')
+    post_thresh_train_path = input('Name of folder containing post threshold training tensorboard')
 if not os.path.isdir('Figures'):
     os.makedirs('Figures')
 save_path = 'Figures/'
