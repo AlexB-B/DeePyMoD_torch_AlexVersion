@@ -128,7 +128,7 @@ ax1.semilogy(steps_main, data_main[:, 3+mod], color='green', linestyle='None', m
 ax1.semilogy(steps_main, data_main[:, 4+mod], color='purple', linestyle='None', marker='.', markersize=1, label='Sign')
 ax1.semilogy(steps_main, data_main[:, 0], color='red', linestyle='None', marker='.', markersize=1, label='Total')
 ax1.legend(numpoints=3, markerscale=5)
-ax1.set_xlim(right=1.01*steps_main[-1])
+ax1.set_xlim(right=1.005*steps_main[-1])
 
 ax2 = axes[1]
 ax2.semilogy(steps_pt, data_pt[:, 1], color='blue', linestyle='None', marker='.', markersize=1, label='MSE')
@@ -179,7 +179,7 @@ for idx_diff_order in start_stress_coeffs_mask:
     series_idx += 1
 
 ax1.legend(ncol=2)
-ax1.set_xlim(right=1.01*steps_main[-1])
+ax1.set_xlim(right=1.005*steps_main[-1])
 
 final_coeffs = final_coeffs_data[:, 0]
 final_mask = final_coeffs_data[:, 1]
