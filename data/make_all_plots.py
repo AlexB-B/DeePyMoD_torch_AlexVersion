@@ -267,15 +267,17 @@ if number_graphs == 1:
     input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
     if input_type == 'Strain':
         scaled_input_expr = lambda t: strain_sf*input_expr(t/time_sf)
-        target_array = scaled_strain_array
+        target_array = scaled_stress_array
+        response_type = 'Stress'
     else:
         scaled_input_expr = lambda t: stress_sf*input_expr(t/time_sf)
-        target_array = scaled_stress_array
+        target_array = scaled_strain_array
+        response_type = 'Strain'
         
     response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred, scaled_input_expr, final_coeffs, final_mask, library_diff_order, input_type)
     
-    fig, ax = plt.subplots(figsize=(7, 5))
-    ax.set_title(f'Reformulation from discovered coefficients of '+input_type+' response')
+    fig, ax = plt.subplots(figsize=(6, 5))
+    ax.set_title(response_type+' response reformulation\nfrom discovered coefficients')
     ax.set_xlabel('Scaled time')
     ax.plot(scaled_time_array, target_array, label='Target')
     ax.plot(scaled_time_array, response_recalc.flatten(), label='Reformulation', marker='.', markersize=1, linestyle='None')
