@@ -229,7 +229,7 @@ if number_graphs == 1: # Tell tale sign that not using real data, so target comp
     errors_DM_tar = VE_datagen.equation_residuals(scaled_time_array, scaled_strain_array, scaled_stress_array, final_coeffs, sparsity_mask=final_mask, diff_order=library_diff_order)
     
     fig, ax = plt.subplots(figsize=(6, 5))
-    ax.set_ylabel('Magnitude of GDM residual')
+    ax.set_ylabel('Magnitude of GDM residual using target')
     ax.set_xlabel('Scaled time')
     ax.semilogy(scaled_time_array, abs(errors_exp_tar), linestyle='None', marker='.', markersize=1, color='green', label='Expected coefficients')
     ax.semilogy(scaled_time_array, abs(errors_DM_tar), linestyle='None', marker='.', markersize=1, color='red', label='Discovered coefficients')
@@ -254,7 +254,7 @@ else:
     errors_DM_pred = VE_datagen.equation_residuals(scaled_time_array, strain_pred, stress_pred, final_coeffs, sparsity_mask=final_mask, diff_order=library_diff_order)
         
 fig, ax = plt.subplots(figsize=(6, 5))
-ax.set_ylabel('Magnitude of GDM residual')
+ax.set_ylabel('Magnitude of GDM residual using prediction')
 ax.set_xlabel('Scaled time')
 ax.semilogy(scaled_time_array, abs(errors_exp_pred), linestyle='None', marker='.', markersize=1, color='green', label='Expected coefficients')
 ax.semilogy(scaled_time_array, abs(errors_DM_pred), linestyle='None', marker='.', markersize=1, color='red', label='Discovered coefficients')
