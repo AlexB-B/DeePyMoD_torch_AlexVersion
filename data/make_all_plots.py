@@ -279,8 +279,8 @@ if number_graphs == 1:
     fig, ax = plt.subplots(figsize=(6, 5))
     ax.set_title(response_type+' response reformulation\nfrom scaled manipulation profile\nand discovered coefficients')
     ax.set_xlabel('Scaled time')
-    ax.plot(scaled_time_array, target_array, label='Target')
-    ax.plot(scaled_time_array, response_recalc.flatten(), label='Reformulation')
+    ax.plot(scaled_time_array, target_array, label='Target', color='blue')
+    ax.plot(scaled_time_array, response_recalc.flatten(), label='Reformulation', color='orange')
     ax.legend()
     
     plt.tight_layout()
