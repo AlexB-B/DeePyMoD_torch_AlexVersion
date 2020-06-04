@@ -87,7 +87,7 @@ number_graphs = fit_data[:, 1:].shape[1]//2
 
 fig, axes = plt.subplots(ncols=number_graphs, squeeze=False, figsize=(6*number_graphs, 5))
 axes = axes.flatten()
-try
+try:
     titles
 except NameError:
     titles = []
