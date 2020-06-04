@@ -87,8 +87,15 @@ number_graphs = fit_data[:, 1:].shape[1]//2
 
 fig, axes = plt.subplots(ncols=number_graphs, squeeze=False, figsize=(6*number_graphs, 5))
 axes = axes.flatten()
+try
+    titles
+except NameError:
+    titles = []
+    
 for tar, ax in enumerate(axes):
-    ax.set_title(input(f'Target title {tar}. Like: Scaled measured voltage manipulation.'))
+    if len(titles) < len(axes):
+        titles += [input(f'Target title {tar}. Like: Scaled measured voltage manipulation.')]
+    ax.set_title(titles[tar])
     ax.set_xlabel('Scaled time')
     ax.plot(time, fit_data[:, 1+(2*tar)], linestyle='None', marker='.', markersize=1, color='blue', label='Target')
     ax.plot(time, fit_data[:, 2+(2*tar)], linestyle='None', marker='.', markersize=1, color='red', label='Prediction')
