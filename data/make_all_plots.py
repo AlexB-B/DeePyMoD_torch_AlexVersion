@@ -277,11 +277,11 @@ if number_graphs == 1:
     response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred, scaled_input_expr, final_coeffs, final_mask, library_diff_order, input_type)
     
     fig, ax = plt.subplots(figsize=(6, 5))
-    ax.set_title(response_type+' response reformulation\nfrom discovered coefficients')
+    ax.set_title(response_type+' response reformulation\nfrom scaled manipulation profile\nand discovered coefficients')
     ax.set_xlabel('Scaled time')
     ax.plot(scaled_time_array, target_array, label='Target')
-    ax.plot(scaled_time_array, response_recalc.flatten(), label='Reformulation', marker='.', markersize=1, linestyle='None')
-    ax.legend(numpoints=3, markerscale=5)
+    ax.plot(scaled_time_array, response_recalc.flatten(), label='Reformulation')
+    ax.legend()
     
     plt.tight_layout()
     plt.savefig(save_path+'recalculation_from_coeffs.png', bbox_inches='tight')
