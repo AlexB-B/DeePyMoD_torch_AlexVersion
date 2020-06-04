@@ -192,14 +192,14 @@ def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, spar
         IVs = [IV.item() for IV in IVs]
         
         # The few skipped values from edge effect avoidance tacked on again.
-        calculated_response_array_initial = np.array(response[:start_index].detach())
+        calculated_response_array_initial = np.array(response[:start_index].detach()).flatten()
     else: # else numpy array
         # Initial values of response and response derivatives determined using numpy gradient.
         response_derivs = num_derivs(response, time_array, max_response_diff_order-1)[start_index, :]
         IVs = list(response_derivs)
         
         # The few skipped values from edge effect avoidance tacked on again.
-        calculated_response_array_initial = response[:start_index]
+        calculated_response_array_initial = response[:start_index].flatten()
     
     reduced_time_array = time_array[start_index:].flatten()
     
