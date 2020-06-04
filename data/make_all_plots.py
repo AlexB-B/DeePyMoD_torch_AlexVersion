@@ -9,11 +9,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
-sys.path.append('/home/working/src')
+
+cwd = os.getcwd()
+git_top_path = cwd[:cwd.index("data")]
+sys.path.append(git_top_path+'src')
 import deepymod_torch.VE_datagen as VE_datagen
 
 # Directories
-cwd = os.getcwd()
 try: # Check if variables already defined in ipython console (requires "-i" flag)
     main_train_path
     post_thresh_train_path
@@ -119,16 +121,16 @@ ax1.semilogy(steps_main, data_main[:, 3+mod], color='green', linestyle='None', m
 ax1.semilogy(steps_main, data_main[:, 4+mod], color='purple', linestyle='None', marker='.', markersize=1, label='Sign')
 ax1.semilogy(steps_main, data_main[:, 0], color='red', linestyle='None', marker='.', markersize=1, label='Total')
 ax1.legend(numpoints=3, markerscale=5)
-ax1.set_xlim(right=steps_main[-1])
+ax1.set_xlim(right=1.01*steps_main[-1])
 
 ax2 = axes[1]
 ax2.semilogy(steps_pt, data_pt[:, 1], color='blue', linestyle='None', marker='.', markersize=1, label='MSE')
 if number_graphs == 2:
-    ax2.semilogy(steps_main, data_main[:, 2], color='deepskyblue', linestyle='None', marker='.', markersize=1, label='MSE_1')
+    ax2.semilogy(steps_pt, data_pt[:, 2], color='deepskyblue', linestyle='None', marker='.', markersize=1, label='MSE_1')
 ax2.semilogy(steps_pt, data_pt[:, 2+mod], color='orange', linestyle='None', marker='.', markersize=1, label='PI')
 ax1.semilogy(steps_pt, data_pt[:, 4+mod], color='purple', linestyle='None', marker='.', markersize=1, label='Sign')
 ax2.semilogy(steps_pt, data_pt[:, 0], color='red', linestyle='None', marker='.', markersize=1, label='Total')
-ax2.set_xlim(left=0)
+# ax2.set_xlim(left=0)
 ax2.tick_params(axis='y', which='both', left=False)
 
 plt.tight_layout()
@@ -170,7 +172,7 @@ for idx_diff_order in start_stress_coeffs_mask:
     series_idx += 1
 
 ax1.legend(ncol=2)
-ax1.set_xlim(right=steps_main[-1])
+ax1.set_xlim(right=1.01*steps_main[-1])
 
 final_coeffs = final_coeffs_data[:, 0]
 final_mask = final_coeffs_data[:, 1]
@@ -194,7 +196,7 @@ for idx_diff_order in stress_mask_aligned:
     ax2.plot(steps_pt, data_pt[:, series_idx], color=colors[idx_diff_order], label=stress_labels[idx_diff_order])
     series_idx += 1
 
-ax2.set_xlim(left=0)
+# ax2.set_xlim(left=0)
 ax2.tick_params(axis='y', which='both', left=False)
 
 plt.tight_layout()
@@ -219,11 +221,11 @@ if number_graphs == 1: # Tell tale sign that not using real data, so target comp
     errors_exp_tar = VE_datagen.equation_residuals(scaled_time_array, scaled_strain_array, scaled_stress_array, expected_coeffs)
     errors_DM_tar = VE_datagen.equation_residuals(scaled_time_array, scaled_strain_array, scaled_stress_array, final_coeffs, sparsity_mask=final_mask, diff_order=library_diff_order)
     
-    fig, ax = plt.subplots(figsize=(7, 5))
+    fig, ax = plt.subplots(figsize=(6, 5))
     ax.set_title('Agreement with target')
     ax.set_xlabel('Scaled time')
-    ax.semilogy(scaled_time_array, errors_exp_tar, linestyle='None', marker='.', markersize=1, color='green', label='Expected coefficients')
-    ax.semilogy(scaled_time_array, errors_DM_tar, linestyle='None', marker='.', markersize=1, color='red', label='Discovered coefficients')
+    ax.semilogy(scaled_time_array, abs(errors_exp_tar), linestyle='None', marker='.', markersize=1, color='green', label='Expected coefficients')
+    ax.semilogy(scaled_time_array, abs(errors_DM_tar), linestyle='None', marker='.', markersize=1, color='red', label='Discovered coefficients')
     ax.legend(numpoints=3, markerscale=5)
     
     plt.tight_layout()
@@ -244,11 +246,11 @@ else:
     errors_exp_pred = VE_datagen.equation_residuals(scaled_time_array, strain_pred, stress_pred, expected_coeffs)
     errors_DM_pred = VE_datagen.equation_residuals(scaled_time_array, strain_pred, stress_pred, final_coeffs, sparsity_mask=final_mask, diff_order=library_diff_order)
         
-fig, ax = plt.subplots(figsize=(7, 5))
+fig, ax = plt.subplots(figsize=(6, 5))
 ax.set_title('Agreement with prediction')
 ax.set_xlabel('Scaled time')
-ax.semilogy(scaled_time_array, errors_exp_pred, linestyle='None', marker='.', markersize=1, color='green', label='Expected coefficients')
-ax.semilogy(scaled_time_array, errors_DM_pred, linestyle='None', marker='.', markersize=1, color='red', label='Discovered coefficients')
+ax.semilogy(scaled_time_array, abs(errors_exp_pred), linestyle='None', marker='.', markersize=1, color='green', label='Expected coefficients')
+ax.semilogy(scaled_time_array, abs(errors_DM_pred), linestyle='None', marker='.', markersize=1, color='red', label='Discovered coefficients')
 ax.legend(numpoints=3, markerscale=5)
     
 plt.tight_layout()
