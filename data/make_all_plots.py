@@ -37,21 +37,18 @@ with open('config_dict_list.txt', 'r') as file:
 
 with open('treatment_info_list.txt', 'r') as file:
     for line in file:
-        value_list = re.findall(r'\d+.\d*', line)
+        value = re.search(r'(: )(.+)', line).group(2)
         if line.startswith('time_sf'):
-            time_sf = float(value_list[0])
+            time_sf = float(value)
         elif line.startswith('strain_sf') or line.startswith('voltage_sf'):
-            strain_sf = float(value_list[0])
+            strain_sf = float(value)
         elif line.startswith('stress_sf') or line.startswith('current_sf'):
-            stress_sf = float(value_list[0])
+            stress_sf = float(value)
 
 with open('DG_info_list.txt', 'r') as file:
-    for line in file:
-        value_list = re.findall(r'\d+.\d*', line)
-        if line.startswith('omega'):
-            omega = float(re.findall(r'\d+.\d*', line)[0])
-        elif line.startswith('Amp'):
-            Amp = int(re.findall(r'\d+', line)[0])
+    file_string = file.read()
+    omega = float(re.search(r'(omega: )(.+)', file_string).group(2))
+    Amp = int(re.search(r'(Amp: )(.+)', file_string).group(2))
             
 dg_data = np.loadtxt('DG_series_data.csv', delimiter=',')
 fit_data = np.loadtxt('NN_series_data.csv', delimiter=',')
