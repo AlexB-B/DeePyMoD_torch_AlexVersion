@@ -155,6 +155,7 @@ plt.savefig(save_path+'loss_evolution.png', bbox_inches='tight')
 
 # Plot coeffs graphs
 first_coeff_column_idx = 4 + number_graphs
+library_diff_order = library_config['diff_order']
 
 colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red']
 strain_labels = ['$\epsilon$', ' ', '$\epsilon_{tt}$', '$\epsilon_{ttt}$']
