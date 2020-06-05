@@ -139,7 +139,9 @@ class Configuration():
             self.optim['use_lstsq_approx'] = False
 
         if 'thresh_func' not in self.optim:
-            self.optim['thresh_func'] = lambda coeff_vector_scaled, *args: torch.std(coeff_vector_scaled, dim=0)
+            def thresh_func(coeff_vector_scaled, *args): # to pickle, do not change to lambda
+                return torch.std(coeff_vector_scaled, dim=0)
+            self.optim['thresh_func'] = thresh_func
             
         if 'print_interval' not in self.report:
             self.report['print_interval'] = 1000
