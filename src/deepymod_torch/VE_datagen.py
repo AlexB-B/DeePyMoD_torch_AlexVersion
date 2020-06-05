@@ -127,7 +127,7 @@ def calculate_stress_finite_difference(time_array, input_expr, E_mods, viscs):
 
 
 # Data generation from differential equation
-def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, sparsity_mask, library_diff_order, input_type):
+def calculate_int_diff_equation(time, response, input_lambda_or_network, coeff_vector, sparsity_mask, library_diff_order, input_type):
     
     # time, response and coeff_vector should either all be tensors, or all be arrays.
     if type(coeff_vector) is torch.Tensor:
@@ -164,8 +164,16 @@ def calculate_int_diff_equation(time, response, input_lambda, coeff_vector, spar
         # U is list (seems to be converted to array before injection) of response and increasing orders of derivative of response.
         # Returns list of derivative of each input element in U.
         
-        # Calculate numerical derivatives of manipualtion variable by spooling a dummy time series around t.
-        input_derivs = num_derivs_single(t, input_lambda, max_input_diff_order)
+        if type(input_lambda_or_network) is torch.nn.Module:
+            t_tensor = torch.tensor(t, dtype=torch.float32, requires_grad=True)
+            input_derivs = [input_lambda_or_network(t_tensor)[0]] # if I ever supply module, is because voltage is 1 of 2 outputs of NN. The [0] here selects the voltage
+            for _ in range(max_input_diff_order):
+                input_derivs += [auto.grad(input_derivs[-1], t_tensor, create_graph=True)[0]]
+
+            input_derivs = [input_deriv.item() for input_deriv in input_derivs]
+        else: # lambda function
+            # Calculate numerical derivatives of manipualtion variable by spooling a dummy time series around t.
+            input_derivs = num_derivs_single(t, input_lambda_or_network, max_input_diff_order)
         
         # Use masks to select manipulation terms from numerical work above...
         # ...and response terms from function parameter, considering ladder of derivative substitions.
