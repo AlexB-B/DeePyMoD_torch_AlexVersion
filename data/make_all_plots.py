@@ -25,6 +25,12 @@ except NameError:
 if not os.path.isdir('Figures'):
     os.makedirs('Figures')
 save_path = 'Figures/'
+if os.path.exists('DG_series_data.csv'):
+    dg_series_str = 'DG_series_data.csv'
+    dg_info_str = 'DG_info_list.txt'
+else:
+    dg_series_str = 'raw_series_data.csv'
+    dg_info_str = 'raw_data_info_list.txt'
 
 # Load data
 with open('config_dict_list.txt', 'r') as file:
@@ -52,14 +58,15 @@ with open('treatment_info_list.txt', 'r') as file:
         elif line.startswith('stress_sf') or line.startswith('current_sf'):
             stress_sf = float(value)
 
-with open('DG_info_list.txt', 'r') as file:
+with open(dg_info_str, 'r') as file:
     file_string = file.read()
     omega = float(re.search(r'(omega: )(.+)', file_string).group(2))
     Amp = int(re.search(r'(Amp: )(.+)', file_string).group(2))
+    input_type = re.search(r'(Input: )(.+)', file_string).group(2)
             
-dg_data = np.loadtxt('DG_series_data.csv', delimiter=',')
+dg_data = np.loadtxt(dg_series_str, delimiter=',')
 fit_data = np.loadtxt('NN_series_data.csv', delimiter=',')
-full_pred = np.loadtxt('full_prediction.csv', delimiter=',')
+# full_pred = np.loadtxt('full_prediction.csv', delimiter=',')
 expected_coeffs = np.loadtxt('expected_coeffs.csv', delimiter=',')
 final_coeffs_data = np.loadtxt('final_coeffs_data.csv', delimiter=',')
 
@@ -97,8 +104,8 @@ for tar, ax in enumerate(axes):
         titles += [input(f'Target title {tar}. Like: Scaled measured voltage manipulation.')]
     ax.set_title(titles[tar])
     ax.set_xlabel('Scaled time')
-    ax.plot(time, fit_data[:, 1+(2*tar)], linestyle='None', marker='.', markersize=1, color='blue', label='Target')
-    ax.plot(time, fit_data[:, 2+(2*tar)], linestyle='None', marker='.', markersize=1, color='red', label='Prediction')
+    ax.plot(time, fit_data[:, 1+tar], linestyle='None', marker='.', markersize=1, color='blue', label='Target')
+    ax.plot(time, fit_data[:, 3+tar], linestyle='None', marker='.', markersize=1, color='red', label='Prediction')
     ax.legend(numpoints=3, markerscale=5)
     
 plt.tight_layout()
@@ -111,8 +118,7 @@ plt.savefig(save_path+'target_prediction_fit.png', bbox_inches='tight')
 
 # Plot losses graphs
 plot_ratio = len(steps_pt)/len(steps_main)
-fig, axes = plt.subplots(ncols=2, figsize=(6, 5), sharey=True, gridspec_kw={'width_ratios': [1, plot_ratio], 'wspace': 0.13})
-# the extra 'wspace' in the dict above I think confuses tight_layout() so the y kwarg for suptitle() must be different
+fig, axes = plt.subplots(ncols=2, figsize=(6, 5), sharey=True, gridspec_kw={'width_ratios': [1, plot_ratio]})
 
 mod = number_graphs - 1
 
@@ -149,14 +155,13 @@ plt.savefig(save_path+'loss_evolution.png', bbox_inches='tight')
 
 # Plot coeffs graphs
 first_coeff_column_idx = 4 + number_graphs
-library_diff_order = library_config['diff_order']
 
 colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red']
 strain_labels = ['$\epsilon$', ' ', '$\epsilon_{tt}$', '$\epsilon_{ttt}$']
 stress_labels = ['$\sigma$', '$\sigma_{t}$', '$\sigma_{tt}$', '$\sigma_{ttt}$']
 
 
-fig, axes = plt.subplots(ncols=2, figsize=(6, 5), sharey=True, gridspec_kw={'width_ratios': [1, plot_ratio], 'wspace': 0.13})
+fig, axes = plt.subplots(ncols=2, figsize=(6, 5), sharey=True, gridspec_kw={'width_ratios': [1, plot_ratio]})
 
 start_strain_coeffs_mask, start_stress_coeffs_mask = list(range(library_diff_order+1)), list(range(library_diff_order+1))
 
@@ -216,8 +221,6 @@ plt.savefig(save_path+'coeff_evolution.png', bbox_inches='tight')
 
 # DV plots
 expected_coeffs = list(expected_coeffs.flatten())
-
-input_type = library_config['input_type']
 
 scaled_time_array = dg_data[:, 0]*time_sf
 scaled_strain_array = dg_data[:, 1]*strain_sf
