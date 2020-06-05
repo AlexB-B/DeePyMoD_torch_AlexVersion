@@ -5,6 +5,7 @@
 import os
 import sys
 import re
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
@@ -33,14 +34,14 @@ else:
     dg_info_str = 'raw_data_info_list.txt'
 
 # Load data
-with open('config_dict_list.txt', 'r') as file:
-    for line in file:
-        dict_start_index, dict_end_index = line.index("{"), line.index("}")
-        dict_str = line[dict_start_index:dict_end_index+1]
-        dict_str = dict_str.replace("<lambda>", "lambda").replace("<", "'").replace(">", "'")
-        line_dict = eval(dict_str)
-        if line.startswith('library'):
-            library_config = line_dict
+# with open('config_dict_list.txt', 'r') as file:
+#     for line in file:
+#         dict_start_index, dict_end_index = line.index("{"), line.index("}")
+#         dict_str = line[dict_start_index:dict_end_index+1]
+#         dict_str = dict_str.replace("<lambda>", "lambda").replace("<", "'").replace(">", "'")
+#         line_dict = eval(dict_str)
+#         if line.startswith('library'):
+#             library_config = line_dict
 #         elif line.startswith('network'):
 #             network_config = line_dict
 #         elif line.startswith('optim'):
@@ -63,10 +64,15 @@ with open(dg_info_str, 'r') as file:
     omega = float(re.search(r'(omega: )(.+)', file_string).group(2))
     Amp = int(re.search(r'(Amp: )(.+)', file_string).group(2))
     input_type = re.search(r'(Input: )(.+)', file_string).group(2)
-            
+    
+with open(foldername+'/model.deepmod', 'rb') as file:
+    model = pickle.load(file)
+
+library_config = model.configs.library
+
 dg_data = np.loadtxt(dg_series_str, delimiter=',')
 fit_data = np.loadtxt('NN_series_data.csv', delimiter=',')
-# full_pred = np.loadtxt('full_prediction.csv', delimiter=',')
+full_pred = np.loadtxt('full_prediction.csv', delimiter=',')
 expected_coeffs = np.loadtxt('expected_coeffs.csv', delimiter=',')
 final_coeffs_data = np.loadtxt('final_coeffs_data.csv', delimiter=',')
 
@@ -272,26 +278,32 @@ plt.savefig(save_path+'prediction_residuals.png', bbox_inches='tight')
 
 
 # Regen plot
+if input_type == 'Strain':
+    response_type = 'Stress'
+    target_array = scaled_stress_array
+else:
+    response_type = 'Strain'
+    target_array = scaled_strain_array
+
 if number_graphs == 1:
     full_pred = full_pred.flatten()
     input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
     if input_type == 'Strain':
         scaled_input_expr = lambda t: strain_sf*input_expr(t/time_sf)
-        target_array = scaled_stress_array
-        response_type = 'Stress'
     else:
         scaled_input_expr = lambda t: stress_sf*input_expr(t/time_sf)
-        target_array = scaled_strain_array
-        response_type = 'Strain'
         
     response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred, scaled_input_expr, final_coeffs, final_mask, library_diff_order, input_type)
+
+else:
+    response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred[:, 1], model.network, final_coeff_vector, final_sparsity_mask, library_diff_order, input_type)
     
-    fig, ax = plt.subplots(figsize=(6, 5))
-    ax.set_title(response_type+' response reformulation\nfrom scaled manipulation profile\nand discovered coefficients')
-    ax.set_xlabel('Scaled time')
-    ax.plot(scaled_time_array, target_array, label='Target', color='blue')
-    ax.plot(scaled_time_array, response_recalc.flatten(), label='Reformulation', color='orange', linestyle='--')
-    ax.legend()
-    
-    plt.tight_layout()
-    plt.savefig(save_path+'recalculation_from_coeffs.png', bbox_inches='tight')
+fig, ax = plt.subplots(figsize=(6, 5))
+ax.set_title(response_type+' response reformulation\nfrom scaled manipulation profile\nand discovered coefficients')
+ax.set_xlabel('Scaled time')
+ax.plot(scaled_time_array, target_array, label='Target', color='blue')
+ax.plot(scaled_time_array, response_recalc.flatten(), label='Reformulation', color='orange', linestyle='--')
+ax.legend()
+
+plt.tight_layout()
+plt.savefig(save_path+'recalculation_from_coeffs.png', bbox_inches='tight')
