@@ -111,8 +111,7 @@ plt.savefig(save_path+'target_prediction_fit.png', bbox_inches='tight')
 
 # Plot losses graphs
 plot_ratio = len(steps_pt)/len(steps_main)
-fig_width = 7*(1+plot_ratio)
-fig, axes = plt.subplots(ncols=2, figsize=(fig_width, 5), sharey=True, gridspec_kw={'width_ratios': [1, plot_ratio], 'wspace': 0.13})
+fig, axes = plt.subplots(ncols=2, figsize=(6, 5), sharey=True, gridspec_kw={'width_ratios': [1, plot_ratio], 'wspace': 0.13})
 # the extra 'wspace' in the dict above I think confuses tight_layout() so the y kwarg for suptitle() must be different
 
 mod = number_graphs - 1
@@ -157,7 +156,7 @@ strain_labels = ['$\epsilon$', ' ', '$\epsilon_{tt}$', '$\epsilon_{ttt}$']
 stress_labels = ['$\sigma$', '$\sigma_{t}$', '$\sigma_{tt}$', '$\sigma_{ttt}$']
 
 
-fig, axes = plt.subplots(ncols=2, figsize=(fig_width, 5), sharey=True, gridspec_kw={'width_ratios': [1, plot_ratio], 'wspace': 0.13})
+fig, axes = plt.subplots(ncols=2, figsize=(6, 5), sharey=True, gridspec_kw={'width_ratios': [1, plot_ratio], 'wspace': 0.13})
 
 start_strain_coeffs_mask, start_stress_coeffs_mask = list(range(library_diff_order+1)), list(range(library_diff_order+1))
 
