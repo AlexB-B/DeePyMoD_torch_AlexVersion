@@ -15,21 +15,19 @@ def model_params_from_coeffs(coeff_vector, model, print_expressions=False):
     # Treat problem to be more amenable to SymPy by
     # ... extracting the common factor, the coeff of strain_t in natural form (not fixed to 1) ...
     # ... and solving as additional equation.
+    coeff_vector = coeff_vector[0:1] + [1] + coeff_vector[1:]
     natural_strain_t_coeff_sym = sym.symbols('c^n_{\epsilon_t}', real=True, positive=True)
-    natural_strain_t_coeff_expr = sym.simplify(coeff_expression_list[1])
-    coeff_expression_list = [sym.simplify(coeff_expression) for i, coeff_expression in enumerate(coeff_expression_list) if i != 1]
+    coeff_expression_list = [sym.simplify(coeff_expression) for coeff_expression in coeff_expression_list]
     
     if print_expressions:
         coeff_equations_list = [sym.Eq(coeff_expression, coeff_value*natural_strain_t_coeff_sym) for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
-        coeff_equations_list += [sym.Eq(natural_strain_t_coeff_expr, natural_strain_t_coeff_sym)]
         dis.display(*coeff_equations_list)
     
     coeff_equations_list = [coeff_expression - coeff_value*natural_strain_t_coeff_sym for coeff_expression, coeff_value in zip(coeff_expression_list, coeff_vector)]
-    coeff_equations_list += [natural_strain_t_coeff_expr - natural_strain_t_coeff_sym]
     
     model_params_value_list = sym.solve(coeff_equations_list, model_params_mask_list + [natural_strain_t_coeff_sym])
     
-    # No need to report value of alpha
+    # No need to report value of natural_strain_t_coeff_sym
     model_params_value_list = [model_params_values[:-1] for model_params_values in model_params_value_list]
     
     if len(model_params_value_list) == 0:
