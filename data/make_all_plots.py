@@ -286,14 +286,13 @@ else:
     target_array = scaled_strain_array
 
 if number_graphs == 1:
-    full_pred = full_pred.flatten()
     input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
     if input_type == 'Strain':
         scaled_input_expr = lambda t: strain_sf*input_expr(t/time_sf)
     else:
         scaled_input_expr = lambda t: stress_sf*input_expr(t/time_sf)
         
-    response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred, scaled_input_expr, final_coeffs, final_mask, library_diff_order, input_type)
+    response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred.flatten(), scaled_input_expr, final_coeffs, final_mask, library_diff_order, input_type)
 
 else:
     response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred[:, 1], model.network, final_coeff_vector, final_sparsity_mask, library_diff_order, input_type)
