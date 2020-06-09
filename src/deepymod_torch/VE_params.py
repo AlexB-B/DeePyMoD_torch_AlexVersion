@@ -5,7 +5,7 @@ import IPython.display as dis
 
 def model_params_from_coeffs(coeff_vector, model, print_expressions=False): 
     
-    if len(coeff_vector) % 2 > 0:
+    if len(coeff_vector) % 2 == 0:
         raise ValueError('No viable mech model discoverable from an even number of coefficients.')
     
     order = len(coeff_vector)//2
