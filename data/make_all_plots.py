@@ -65,7 +65,7 @@ with open(dg_info_str, 'r') as file:
     Amp = int(re.search(r'(Amp: )(.+)', file_string).group(2))
     input_type = re.search(r'(Input: )(.+)', file_string).group(2)
     
-with open(foldername+'/model.deepmod', 'rb') as file:
+with open('model.deepmod', 'rb') as file:
     model = pickle.load(file)
 
 library_config = model.configs.library
