@@ -411,14 +411,11 @@ def align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order):
     
     # Adjust strain mask and coeffs to account for missing first strain derivative.
     # Mask values above 0 are shifted up and a mask value of 1 added so that mask values always refer to diff order.
+    strain_mask_temp = list(strain_mask[strain_mask > 0] + 1)
+    strain_t_idx = -len(strain_mask_temp)
+    strain_mask = list(strain_mask[:strain_t_idx]) + [1] + strain_mask_temp
     # A coeff of 1 is added for the coeff of the first strain derivative.
-    strain_mask_temp = [strain_mask_item + 1 for strain_mask_item in strain_mask if strain_mask_item > 0]
-    if 0 in strain_mask:
-        strain_mask = [0, 1] + strain_mask_temp
-        strain_coeffs = [strain_coeffs[0]] + [1] + strain_coeffs[1:]
-    else:
-        strain_mask = [1] + strain_mask_temp
-        strain_coeffs = [1] + strain_coeffs
+    strain_coeffs.insert(strain_t_idx, 1)
     
     # Arrays in, arrays out.
     strain_coeffs_mask = np.array(strain_coeffs), np.array(strain_mask, dtype=int)
