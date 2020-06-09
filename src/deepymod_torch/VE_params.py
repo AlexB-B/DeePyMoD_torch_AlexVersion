@@ -179,11 +179,16 @@ def scaled_coeffs_from_true(true_coeffs, time_sf, strain_sf, stress_sf):
     return list(scaled_coeff_guess)
 
 
-def true_coeffs_from_scaled(scaled_coeffs, time_sf, strain_sf, stress_sf):
+def true_coeffs_from_scaled(scaled_coeffs, time_sf, strain_sf, stress_sf, mask='full', library_diff_order='full'):
     
     scaled_coeffs_array = np.array(scaled_coeffs).flatten()
+    if mask is not 'full':
+        mask = np.array(mask).flatten()
+        scaled_coeffs_array = include_zero_coeffs(scaled_coeffs_array, mask, library_diff_order)
+        
     alpha_array = coeff_scaling_values(scaled_coeffs_array, time_sf, strain_sf, stress_sf)
     true_coeffs = scaled_coeffs_array/alpha_array
+    true_coeffs = true_coeffs[true_coeffs != 0] # removes zero elements if any present due to non-full mask
     
     return list(true_coeffs)
 
@@ -215,3 +220,15 @@ def coeff_scaling_values(coeffs, time_sf, strain_sf, stress_sf):
     alpha_array = alpha_LHS/alpha_n_array
     
     return alpha_array
+
+
+def include_zero_coeffs(coeff_vector, sparsity_mask, library_diff_order):
+    
+    full_coeff_list = list(coeff_vector)
+    for term_id in range(library_diff_order*2 + 1): # term_ids are full mask
+        if term_id not in sparsity_mask:
+            full_coeff_list.insert(term_id, 0)
+            
+    full_coeff_array = np.array(full_coeff_list)
+    
+    return full_coeff_array
