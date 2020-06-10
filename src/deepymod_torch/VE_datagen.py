@@ -173,13 +173,15 @@ def calculate_int_diff_equation(time, response, input_lambda_or_network, coeff_v
             for _ in range(max_input_diff_order):
                 input_derivs += [auto.grad(input_derivs[-1], t_tensor, create_graph=True)[0]]
 
-            input_derivs = [input_deriv.item() for input_deriv in input_derivs]
+            input_derivs = np.array([input_deriv.item() for input_deriv in input_derivs])
         
         # Use masks to select manipulation terms from numerical work above...
         # ...and response terms from function parameter, considering ladder of derivative substitions.
         # Concatenate carefully to align with coefficient order.
-        input_terms = np.array([input_derivs[mask_value] for mask_value in input_mask])
-        response_terms = np.array([U[mask_value] for mask_value in response_mask[:-1]])
+#         input_terms = np.array([input_derivs[mask_value] for mask_value in input_mask])
+        input_terms = input_derivs[input_mask]
+#         response_terms = np.array([U[mask_value] for mask_value in response_mask[:-1]])
+        response_terms = U[response_mask[:-1]]
         terms_array = np.concatenate((input_terms, response_terms))
         
         # Multiply aligned coeff-term pairs and divide by coeff of highest order deriv of response variable.
