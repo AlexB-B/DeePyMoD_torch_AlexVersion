@@ -65,7 +65,7 @@ def prep_plot(data, target):
     axes = axes.flatten()
     for tar, ax in enumerate(axes):
         ax.set_title(f'Target Variable #{tar+1}')
-        ax.set_xlabel('Time (s)')
+        ax.set_xlabel('Scaled time')
         ax.plot(data.detach(), target[:, tar], linestyle='None', marker='.', markersize=1, color='blue', label='Target')
         ax.plot(0, linestyle='None', marker='.', markersize=1, color='red', label='Prediction') # dummy, will be replaced by prediction
         ax.legend(numpoints=3, markerscale=5)
