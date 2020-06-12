@@ -33,22 +33,26 @@ else:
     dg_series_str = 'raw_series_data.csv'
     dg_info_str = 'raw_data_info_list.txt'
 
-# Load data
-# with open('config_dict_list.txt', 'r') as file:
-#     for line in file:
-#         dict_start_index, dict_end_index = line.index("{"), line.index("}")
-#         dict_str = line[dict_start_index:dict_end_index+1]
-#         dict_str = dict_str.replace("<lambda>", "lambda").replace("<", "'").replace(">", "'")
-#         line_dict = eval(dict_str)
-#         if line.startswith('library'):
-#             library_config = line_dict
-#         elif line.startswith('network'):
-#             network_config = line_dict
-#         elif line.startswith('optim'):
-#             optim_config = line_dict
-#         elif line.startswith('report'):
-#             report_config = line_dict
-
+if os.path.exists('model.deepmod'): # if this file is absent, will not be able to do regen with real data and will hit error. All preceding stuff will work with the alt option though.
+    with open('model.deepmod', 'rb') as file:
+        model = pickle.load(file)
+    library_config = model.configs.library
+else:
+    with open('config_dict_list.txt', 'r') as file:
+        for line in file:
+            dict_start_index, dict_end_index = line.index("{"), line.index("}")
+            dict_str = line[dict_start_index:dict_end_index+1]
+            dict_str = dict_str.replace("<lambda>", "lambda").replace("<", "'").replace(">", "'")
+            line_dict = eval(dict_str)
+            if line.startswith('library'):
+                library_config = line_dict
+#             elif line.startswith('network'):
+#                 network_config = line_dict
+#             elif line.startswith('optim'):
+#                 optim_config = line_dict
+#             elif line.startswith('report'):
+#                 report_config = line_dict
+    
 with open('treatment_info_list.txt', 'r') as file:
     for line in file:
         value = re.search(r'(: )(.+)', line).group(2)
@@ -64,11 +68,6 @@ with open(dg_info_str, 'r') as file:
     omega = float(re.search(r'(omega: )(.+)', file_string).group(2))
     Amp = int(re.search(r'(Amp: )(.+)', file_string).group(2))
     input_type = re.search(r'(Input: )(.+)', file_string).group(2)
-    
-with open('model.deepmod', 'rb') as file:
-    model = pickle.load(file)
-
-library_config = model.configs.library
 
 dg_data = np.loadtxt(dg_series_str, delimiter=',')
 fit_data = np.loadtxt('NN_series_data.csv', delimiter=',')
@@ -111,7 +110,7 @@ for tar, ax in enumerate(axes):
     ax.set_title(titles[tar])
     ax.set_xlabel('Scaled time')
     ax.plot(time, fit_data[:, 1+tar], linestyle='None', marker='.', markersize=1, color='blue', label='Target')
-    ax.plot(time, fit_data[:, 3+tar], linestyle='None', marker='.', markersize=1, color='red', label='Prediction')
+    ax.plot(time, fit_data[:, 1+number_graphs+tar], linestyle='None', marker='.', markersize=1, color='red', label='Prediction')
     ax.legend(numpoints=3, markerscale=5)
     
 plt.tight_layout()
