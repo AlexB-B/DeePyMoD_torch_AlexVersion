@@ -163,6 +163,7 @@ def convert_between_models(E_mod_list, visc_list, origin_model, print_expression
     
     dest_model_values = model_params_from_coeffs(coeff_value_list, dest_model, print_expressions=print_expressions)[0][0]
     
+    dest_model_values = [float(param) for param in dest_model_values]
     E_mod_list_result = dest_model_values[:len(E_mod_list)]
     visc_list_result = dest_model_values[len(E_mod_list):]
     
