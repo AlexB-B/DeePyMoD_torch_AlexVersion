@@ -148,11 +148,8 @@ def maxwell_sym_sum(order):
 
 def convert_between_models(E_mod_list, visc_list, origin_model, print_expressions=False):
     
-    if origin_model == 'GMM':
-        dest_model = 'GKM'
-    else: # origin_model == 'GKM'
-        dest_model = 'GMM'
-    
+    dest_model = 'GKM' if origin_model == 'GMM' else 'GMM'
+
     if print_expressions:
         print(f'Universal coefficients from {origin_model} parameters:')
     
