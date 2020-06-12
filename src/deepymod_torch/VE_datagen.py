@@ -413,9 +413,10 @@ def align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order):
     
     # Adjust strain mask and coeffs to account for missing first strain derivative.
     # Mask values above 0 are shifted up and a mask value of 1 added so that mask values always refer to diff order.
-    strain_mask_temp = list(strain_mask[strain_mask > 0] + 1)
-    strain_t_idx = -len(strain_mask_temp)
-    strain_mask = list(strain_mask[:strain_t_idx]) + [1] + strain_mask_temp
+    strain_mask_stay = list(strain_mask[strain_mask < 1])
+    strain_mask_shift = list(strain_mask[strain_mask > 0] + 1)
+    strain_t_idx = len(strain_mask_stay)
+    strain_mask = strain_mask_stay + [1] + strain_mask_shift
     # A coeff of 1 is added for the coeff of the first strain derivative.
     strain_coeffs.insert(strain_t_idx, 1)
     
@@ -494,10 +495,8 @@ def equation_residuals(time_array, strain_array, stress_array, coeffs, sparsity_
     strain_theta = num_derivs(strain_array, time_array, diff_order)
     stress_theta = num_derivs(stress_array, time_array, diff_order)
     
-    reduced_strain_theta = [strain_theta[:, mask_value:mask_value+1] for mask_value in strain_mask]
-    reduced_stress_theta = [stress_theta[:, mask_value:mask_value+1] for mask_value in stress_mask]
-    num_theta = np.concatenate(reduced_strain_theta + reduced_stress_theta, axis=1)
-    
+    num_theta = np.concatenate((strain_theta[:, strain_mask], stress_theta[:, stress_mask]), axis=1)
+
     residuals = num_theta @ coeffs_array
         
     return residuals
