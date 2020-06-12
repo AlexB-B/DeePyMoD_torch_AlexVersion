@@ -1,0 +1,7 @@
+Model: GKM
+E: [2.0, 2.0]
+eta: [10.0]
+Input: Stress
+Desc: Half Sinc
+omega: 1
+Amp: 7
