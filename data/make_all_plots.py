@@ -33,11 +33,12 @@ else:
     dg_series_str = 'raw_series_data.csv'
     dg_info_str = 'raw_data_info_list.txt'
 
-if os.path.exists('model.deepmod'): # if this file is absent, will not be able to do regen with real data and will hit error. All preceding stuff will work with the alt option though.
+# if this file is absent, will not be able to do regen with real data and will hit error. All preceding stuff will work with the alt option though.
+try
     with open('model.deepmod', 'rb') as file:
         model = pickle.load(file)
     library_config = model.configs.library
-else:
+except:
     with open('config_dict_list.txt', 'r') as file:
         for line in file:
             dict_start_index, dict_end_index = line.index("{"), line.index("}")
@@ -192,7 +193,7 @@ ax1.legend(ncol=2)
 ax1.set_xlim(right=1.005*steps_main[-1])
 
 final_coeffs = final_coeffs_data[:, 0]
-final_mask = final_coeffs_data[:, 1]
+final_mask = final_coeffs_data[:, -1]
 strain_coeffs_mask, stress_coeffs_mask = VE_datagen.align_masks_coeffs(final_coeffs, final_mask, library_diff_order)
 
 strain_mask_aligned = strain_coeffs_mask[1]
@@ -294,7 +295,7 @@ if number_graphs == 1:
     response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred.flatten(), scaled_input_expr, final_coeffs, final_mask, library_diff_order, input_type)
 
 else:
-    response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred[:, 1], model.network, final_coeff_vector, final_sparsity_mask, library_diff_order, input_type)
+    response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred[:, 1], model.network, final_coeffs, final_mask, library_diff_order, input_type)
     
 fig, ax = plt.subplots(figsize=(6, 5))
 ax.set_title(response_type+' response reformulation\nfrom scaled manipulation profile\nand discovered coefficients')
