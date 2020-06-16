@@ -34,11 +34,11 @@ else:
     dg_info_str = 'raw_data_info_list.txt'
 
 # if this file is absent, will not be able to do regen with real data and will hit error. All preceding stuff will work with the alt option though.
-try
-    with open('model.deepmod', 'rb') as file:
+try:
+    with open('model.pickle', 'rb') as file:
         model = pickle.load(file)
     library_config = model.configs.library
-except:
+except AttributeError:
     with open('config_dict_list.txt', 'r') as file:
         for line in file:
             dict_start_index, dict_end_index = line.index("{"), line.index("}")
@@ -128,12 +128,17 @@ fig, axes = plt.subplots(ncols=2, figsize=(6, 5), sharey=True, gridspec_kw={'wid
 
 mod = number_graphs - 1
 
+if number_graphs > 1:
+    MSE_1_label = 'MSE 1'
+else:
+    MSE_1_label = 'MSE'
+
 ax1 = axes[0]
 ax1.set_xlabel('                Epochs')
 ax1.set_ylabel('Loss Magnitudes')
-ax1.semilogy(steps_main, data_main[:, 1], color='blue', linestyle='None', marker='.', markersize=1, label='MSE')
+ax1.semilogy(steps_main, data_main[:, 1], color='blue', linestyle='None', marker='.', markersize=1, label=MSE_1_label)
 if number_graphs == 2:
-    ax1.semilogy(steps_main, data_main[:, 2], color='deepskyblue', linestyle='None', marker='.', markersize=1, label='MSE_1')
+    ax1.semilogy(steps_main, data_main[:, 2], color='deepskyblue', linestyle='None', marker='.', markersize=1, label='MSE 2')
 ax1.semilogy(steps_main, data_main[:, 2+mod], color='orange', linestyle='None', marker='.', markersize=1, label='PI')
 ax1.semilogy(steps_main, data_main[:, 3+mod], color='green', linestyle='None', marker='.', markersize=1, label='L1')
 ax1.semilogy(steps_main, data_main[:, 4+mod], color='purple', linestyle='None', marker='.', markersize=1, label='Sign')
@@ -142,9 +147,9 @@ ax1.legend(numpoints=3, markerscale=5)
 ax1.set_xlim(right=1.005*steps_main[-1])
 
 ax2 = axes[1]
-ax2.semilogy(steps_pt, data_pt[:, 1], color='blue', linestyle='None', marker='.', markersize=1, label='MSE')
+ax2.semilogy(steps_pt, data_pt[:, 1], color='blue', linestyle='None', marker='.', markersize=1, label=MSE_1_label)
 if number_graphs == 2:
-    ax2.semilogy(steps_pt, data_pt[:, 2], color='deepskyblue', linestyle='None', marker='.', markersize=1, label='MSE_1')
+    ax2.semilogy(steps_pt, data_pt[:, 2], color='deepskyblue', linestyle='None', marker='.', markersize=1, label='MSE 2')
 ax2.semilogy(steps_pt, data_pt[:, 2+mod], color='orange', linestyle='None', marker='.', markersize=1, label='PI')
 ax1.semilogy(steps_pt, data_pt[:, 4+mod], color='purple', linestyle='None', marker='.', markersize=1, label='Sign')
 ax2.semilogy(steps_pt, data_pt[:, 0], color='red', linestyle='None', marker='.', markersize=1, label='Total')
@@ -279,13 +284,13 @@ plt.savefig(save_path+'prediction_residuals.png', bbox_inches='tight')
 
 # Regen plot
 if input_type == 'Strain':
-    response_type = 'Stress'
     target_array = scaled_stress_array
 else:
-    response_type = 'Strain'
     target_array = scaled_strain_array
 
 if number_graphs == 1:
+    response_type = 'Stress' if input_type == 'Strain' else 'Strain'
+    
     input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
     if input_type == 'Strain':
         scaled_input_expr = lambda t: strain_sf*input_expr(t/time_sf)
@@ -294,15 +299,23 @@ if number_graphs == 1:
         
     response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred.flatten(), scaled_input_expr, final_coeffs, final_mask, library_diff_order, input_type)
 
+    title_bit = 'scaled'
 else:
+    response_type = 'Current' if input_type == 'Strain' else 'Voltage'
+    
     response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred[:, 1], model.network, final_coeffs, final_mask, library_diff_order, input_type)
     
+    title_bit = 'fit'
+    
 fig, ax = plt.subplots(figsize=(6, 5))
-ax.set_title(response_type+' response reformulation\nfrom scaled manipulation profile\nand discovered coefficients')
+ax.set_title(response_type+' response reformulation\nfrom '+ title_bit +' manipulation profile\nand discovered coefficients')
 ax.set_xlabel('Scaled time')
-ax.plot(scaled_time_array, target_array, label='Target', color='blue')
+if number_graphs == 1:
+    ax.plot(scaled_time_array, target_array, label='Target', color='blue')
+else:
+    ax.plot(scaled_time_array, target_array, label='Target', color='blue', linestyle='None', marker='.', markersize=1)
 ax.plot(scaled_time_array, response_recalc.flatten(), label='Reformulation', color='orange', linestyle='--')
-ax.legend()
+ax.legend(numpoints=3, markerscale=5)
 
 plt.tight_layout()
 plt.savefig(save_path+'recalculation_from_coeffs.png', bbox_inches='tight')
