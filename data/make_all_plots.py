@@ -16,6 +16,13 @@ git_top_path = cwd[:cwd.index("data")]
 sys.path.append(git_top_path+'src')
 import deepymod_torch.VE_datagen as VE_datagen
 
+# Dummy func redefinitions for pickle.
+def mech_library_real():0
+def mech_library():0
+def thresh_pc():0
+def thresh_func():0
+
+
 # Directories
 try: # Check if variables already defined in ipython console (requires "-i" flag)
     main_train_path
