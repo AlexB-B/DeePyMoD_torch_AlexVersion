@@ -1,0 +1,3 @@
+date_stamp: 16/06/2020 14:25:49
+NumPy_seed: 2
+Torch_seed: 0
