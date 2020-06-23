@@ -1,76 +1,86 @@
 # import os
-import sys
+# import sys
 # from datetime import datetime
 # import pickle
 import numpy as np
 # import matplotlib.pyplot as plt
 # plt.style.use('ggplot')
-#import sympy as sym
 import torch
 
-sys.path.append('../src')
-import deepymod_torch.VE_datagen as VE_datagen
+# sys.path.append('../src')
 # import deepymod_torch.VE_params as VE_params
+# import deepymod_torch.VE_datagen as VE_datagen
 # from deepymod_torch.DeepMod import run_deepmod
 
-np_seed = 2
+from deepymod_torch.DeepMod import Configuration, DeepMod
+import deepymod_torch.training as training
+import torch.nn as nn
+
+# random seeding
+np_seed = 4
 torch_seed = 0
 np.random.seed(np_seed)
 torch.manual_seed(torch_seed)
 
 ##
 
-input_type = 'Strain'
+# general_path = 'Oscilloscope data CRI electronics analogy/'
+# specific_path = 'AWG 7V half sinc KELVIN cap 1000/' # It is precisely here that changes the data we are grabbing to test.
+# path = general_path + specific_path
+path = ''
 
-# For Boltzmann DG, specific model required for calculation of response given manipulation type. Strain -> GMM, Stress -> GKM.
-# For odeint method, no need to consider.
-# mech_model = 'GMM' 
+# Some of these factors are just for saving at the end but...
+# ... input_type is used in recalc after DM
+# ... omega is used in time scaling.
+# ... mech_model is used to predict coeffs and recover mech params
+# input_type = 'Strain'
+# mech_model = 'GKM'
+# func_desc = 'Half Sinc'
+omega = 2*np.pi * 5 * 0.1
+# Amp = 7
 
-E = [1, 1, 1]
-eta = [0.5, 2.5]
+channel_1_data = np.loadtxt(path+'Channel 1 total voltage.csv', delimiter=',', skiprows=3)
+channel_2_data = np.loadtxt(path+'Channel 2 voltage shunt resistor.csv', delimiter=',', skiprows=3)
 
 ##
 
-omega = 1
-Amp = 7
-input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
-d_input_expr = lambda t: (Amp/t)*(np.cos(omega*t) - np.sin(omega*t)/(omega*t))
-input_torch_lambda = lambda t: Amp*torch.sin(omega*t)/(omega*t)
+lower = 806
+upper = -759
+
+voltage_array = channel_1_data[lower:upper, 1:]
+voltage_shunt_array = channel_2_data[lower:upper, 1:]
+time_array = channel_1_data[lower:upper, :1]
 
 ##
 
-time_array = np.linspace(10**-10, 10*np.pi/omega, 5000).reshape(-1, 1)
+# Maxwell shunt
+r_shunt = 10.2 # measured using multimeter
+# Kelvin shunt
+# r_shunt = 10.2 # measured using multimeter
 
-strain_array, stress_array = VE_datagen.calculate_strain_stress(input_type, time_array, input_expr, E, eta, D_input_lambda=d_input_expr)
+current_array = voltage_shunt_array/r_shunt
 
 ##
 
 # 'normalising'
-time_sf = omega/1.2
-strain_sf = 1/np.max(abs(strain_array))
-stress_sf = 1/np.max(abs(stress_array))
-# print(time_sf, strain_sf, stress_sf)
+t_sf = omega/1.2 # Aim for this to be such that the T of the scaled data is a bit less than 2pi
+V_sf = 1/np.max(abs(voltage_array))
+I_sf = 1/np.max(abs(current_array))
+scaled_time_array = time_array*t_sf
+scaled_voltage = voltage_array*V_sf
+scaled_current = current_array*I_sf
 
-scaled_time_array = time_array*time_sf
-scaled_strain_array = strain_array*strain_sf
-scaled_stress_array = stress_array*stress_sf
-if input_type == 'Strain':
-    scaled_input_expr = lambda t: strain_sf*input_expr(t/time_sf)
-    scaled_input_torch_lambda = lambda t: strain_sf*input_torch_lambda(t/time_sf)
-    scaled_target_array = scaled_stress_array
-elif input_type == 'Stress':
-    scaled_input_expr = lambda t: stress_sf*input_expr(t/time_sf)
-    scaled_input_torch_lambda = lambda t: stress_sf*input_torch_lambda(t/time_sf)
-    scaled_target_array = scaled_strain_array
+# structuring
+target_array = np.concatenate((scaled_voltage, scaled_current), axis=1)
 
 ##
 
-number_of_samples = 1000
+# random sampling
+number_of_samples = scaled_time_array.size
 
-reordered_row_indices = np.random.permutation(time_array.size)
-
+reordered_row_indices = np.random.permutation(scaled_time_array.size)
 reduced_time_array = scaled_time_array[reordered_row_indices, :][:number_of_samples]
-reduced_target_array = noisy_target_array[reordered_row_indices, :][:number_of_samples]
+reduced_target_array = target_array[reordered_row_indices, :][:number_of_samples]
 
 ##
 
@@ -81,36 +91,26 @@ target_tensor = torch.tensor(reduced_target_array, dtype=torch.float32)
 
 
 
-
 ##
 
 import torch.autograd as auto
-    
-def mech_library(inputs, **library_config):    
+
+def mech_library_real(inputs, **library_config):    
     
     prediction, data = inputs
     
-    # Load already calculated derivatives of manipulation variable
-    input_theta = library_config['input_theta']
-    if data.shape[0] == 1: # Swaps real input_theta out for dummy in initialisation pass.
-        input_theta = torch.ones((1, input_theta.shape[1]))
+    # The first column of prediction is always strain
+    strain_derivs = auto_deriv(data, prediction[:, :1], library_config['diff_order'])
+    strain_theta = torch.cat((prediction[:, :1], strain_derivs), dim=1)
     
-    # Automatic derivatives of response variable 
-    output_derivs = auto_deriv(data, prediction, library_config['diff_order'])
-    output_theta = torch.cat((prediction, output_derivs), dim=1)
+    # The second column is always stress
+    stress_derivs = auto_deriv(data, prediction[:, 1:], library_config['diff_order'])
+    stress_theta = torch.cat((prediction[:, 1:], stress_derivs), dim=1)
     
-    # Identify the manipulation/response as Stress/Strain and organise into returned variables
-    if library_config['input_type'] == 'Strain':
-        strain = input_theta
-        stress = output_theta
-    else: # 'Stress'
-        strain = output_theta
-        stress = input_theta
-        
-    strain_t = strain[:, 1:2] # Extract the first time derivative of strain
-    strain = torch.cat((strain[:, 0:1], strain[:, 2:]), dim=1) # remove this before it gets put into theta
-    strain *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
-    theta = torch.cat((strain, stress), dim=1) # I have arbitrarily set the convention of making Strain the first columns of data
+    strain_t = strain_theta[:, 1:2] # Extract the first time derivative of strain
+    strain_theta = torch.cat((strain_theta[:, 0:1], strain_theta[:, 2:]), dim=1) # remove this before it gets put into theta
+    strain_theta *= -1 # The coefficient of all strain terms will always be negative. rather than hoping deepmod will find these negative terms, we assume the negative factor here and later on DeepMoD will just find positive coefficients
+    theta = torch.cat((strain_theta, stress_theta), dim=1) # I have arbitrarily set the convention of making Strain the first columns of data
     
     return [strain_t], theta
 
@@ -132,31 +132,21 @@ def auto_deriv(data, prediction, max_order):
 
 ##
 
-library_diff_order = 3
-
-input_data = scaled_input_torch_lambda(time_tensor)
-input_derivs = auto_deriv(time_tensor, input_data, library_diff_order)
-input_theta = torch.cat((input_data.detach(), input_derivs.detach()), dim=1)
-
-##
-
 percent = 0.05
 def thresh_pc(*args): # Keep as full function so that it can be pickled
     return percent
 
 ##
 
-library_config = {'library_func': mech_library,
-                  'diff_order': library_diff_order,
-                  'coeff_sign': 'positive',
-                  'input_type': input_type,
-                  'input_theta': input_theta}
+library_config = {'library_func': mech_library_real,
+                  'diff_order': 3,
+                  'coeff_sign': 'positive'}
 
 network_config = {'hidden_dim': 30}
 
-optim_config = {'lr_coeffs': 0.002,
+optim_config = {'l1': 10**-5,
                 'thresh_func': thresh_pc,
-                'l1': 10**-6}
+                'lr_coeffs': 0.002}
 
 report_config = {'plot': True}
 
