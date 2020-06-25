@@ -1,5 +1,5 @@
-# Use command %run -i "/home/working/data/make_all_plots.py"
-# or %run -i "/home/alex/DeePyMoD_torch_AlexVersion/data/make_all_plots.py"
+# Use command %run -i "/home/working/data/make_all_plots.py" (local)
+# or %run -i "/home/alex/DeePyMoD_torch_AlexVersion/data/make_all_plots.py" (remote)
 # Run from console with cwd as folder containing csv files of interest etc.
 
 import os
@@ -96,7 +96,10 @@ event_file = next(filter(lambda filename: filename[:6] =='events', os.listdir(pa
 summary_iterator = EventAccumulator(str(path + '/' + event_file)).Reload()
 tags_pt = summary_iterator.Tags()['scalars']
 steps_pt = np.array([event.step for event in summary_iterator.Scalars(tags_pt[0])])
+# first_10001 = steps_pt <= 10001
+# steps_pt = steps_pt[first_10001]
 data_pt = np.array([[event.value for event in summary_iterator.Scalars(tag)] for tag in tags_pt]).T
+# data_pt = data_pt[first_10001, :]
 
 
             
@@ -241,9 +244,14 @@ plt.savefig(save_path+'coeff_evolution.png', bbox_inches='tight')
 # DV plots
 expected_coeffs = list(expected_coeffs.flatten())
 
-scaled_time_array = dg_data[:, 0]*time_sf
-scaled_strain_array = dg_data[:, 1]*strain_sf
-scaled_stress_array = dg_data[:, 2]*stress_sf
+time_array = dg_data[:, 0]
+# time_array = time_array - min(time_array) + 10**-10
+strain_array = dg_data[:, 1]
+stress_array = dg_data[:, 2]
+
+scaled_time_array = time_array*time_sf
+scaled_strain_array = strain_array*strain_sf
+scaled_stress_array = strain_array*stress_sf
 
 if number_graphs == 1: # Tell tale sign that not using real data, so target comp allowed.
     errors_exp_tar = VE_datagen.equation_residuals(scaled_time_array, scaled_strain_array, scaled_stress_array, expected_coeffs)
@@ -291,13 +299,11 @@ plt.savefig(save_path+'prediction_residuals.png', bbox_inches='tight')
 
 # Regen plot
 if input_type == 'Strain':
-    target_array = scaled_stress_array
+    target_array = stress_array
 else:
-    target_array = scaled_strain_array
+    target_array = strain_array
 
-if number_graphs == 1:
-    response_type = 'Stress' if input_type == 'Strain' else 'Strain'
-    
+if number_graphs == 1:    
     input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
     if input_type == 'Strain':
         scaled_input_expr = lambda t: strain_sf*input_expr(t/time_sf)
@@ -305,23 +311,40 @@ if number_graphs == 1:
         scaled_input_expr = lambda t: stress_sf*input_expr(t/time_sf)
         
     response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred.flatten(), scaled_input_expr, final_coeffs, final_mask, library_diff_order, input_type)
-
-    title_bit = 'scaled'
-else:
-    response_type = 'Current' if input_type == 'Strain' else 'Voltage'
     
+    if input_type == 'Strain':
+        unscaled_response_recalc = response_recalc/stress_sf
+        response_type = 'Stress'
+        unit_str = 'Pa'
+    else:
+        unscaled_response_recalc = response_recalc/strain_sf
+        response_type = 'Strain'
+        unit_str = 'dimensionless'
+        
+    title_bit = 'scaled'
+else:    
     response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred[:, 1], model.network, final_coeffs, final_mask, library_diff_order, input_type)
+    
+    if input_type == 'Strain':
+        unscaled_response_recalc = response_recalc/stress_sf
+        response_type = 'Current'
+        unit_str = 'A'
+    else:
+        unscaled_response_recalc = response_recalc/strain_sf
+        response_type = 'Voltage'
+        unit_str = 'V'
     
     title_bit = 'fit'
     
 fig, ax = plt.subplots(figsize=(6, 5))
-ax.set_title(response_type+' response reformulation\nfrom '+ title_bit +' manipulation profile\nand discovered coefficients')
-ax.set_xlabel('Scaled time')
+ax.set_title('Response reformulation\nfrom '+ title_bit +' manipulation profile\nand discovered coefficients')
+ax.set_ylabel(response_type + ' following scaling reversal ('+unit_str+')')
+ax.set_xlabel('Time (s)')
 if number_graphs == 1:
-    ax.plot(scaled_time_array, target_array, label='Target', color='blue')
+    ax.plot(time_array, target_array, label='Original Synthesis', color='blue', linewidth=2)
 else:
-    ax.plot(scaled_time_array, target_array, label='Target', color='blue', linestyle='None', marker='.', markersize=1)
-ax.plot(scaled_time_array, response_recalc.flatten(), label='Reformulation', color='orange', linestyle='--')
+    ax.plot(time_array, target_array, label='Original Data', color='blue', linestyle='None', marker='.', markersize=1)
+ax.plot(time_array, unscaled_response_recalc.flatten(), label='Reformulation', color='darkorange', linestyle='--', linewidth=2)
 ax.legend(numpoints=3, markerscale=5)
 
 plt.tight_layout()
