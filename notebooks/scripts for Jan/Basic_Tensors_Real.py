@@ -20,9 +20,10 @@ torch.manual_seed(torch_seed)
 
 ##
 
-general_path = 'Oscilloscope data CRI electronics analogy/'
-specific_path = 'AWG 7V half sinc KELVIN cap 1000/' # It is precisely here that changes the data we are grabbing to test.
-path = general_path + specific_path
+# general_path = 'Oscilloscope data CRI electronics analogy/'
+# specific_path = 'AWG 7V half sinc KELVIN cap 1000/' # It is precisely here that changes the data we are grabbing to test.
+# path = general_path + specific_path
+path = ''
 
 # Some of these factors are just for saving at the end but...
 # ... input_type is used in recalc after DM

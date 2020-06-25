@@ -51,7 +51,7 @@ strain_sf = 1/np.max(abs(strain_array))
 stress_sf = 1/np.max(abs(stress_array))
 # print(time_sf, strain_sf, stress_sf)
 
-# scaled_time_array = time_array*time_sf
+scaled_time_array = time_array*time_sf
 scaled_strain_array = strain_array*strain_sf
 scaled_stress_array = stress_array*stress_sf
 if input_type == 'Strain':
@@ -67,10 +67,10 @@ elif input_type == 'Stress':
 
 number_of_samples = 1000
 
-reordered_row_indices = np.random.permutation(time_array.size)
+reordered_row_indices = np.random.permutation(scaled_time_array.size)
 
 reduced_time_array = scaled_time_array[reordered_row_indices, :][:number_of_samples]
-reduced_target_array = noisy_target_array[reordered_row_indices, :][:number_of_samples]
+reduced_target_array = scaled_target_array[reordered_row_indices, :][:number_of_samples]
 
 ##
 
