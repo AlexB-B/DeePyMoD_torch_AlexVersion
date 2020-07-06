@@ -129,9 +129,8 @@ def calculate_stress_finite_difference(time_array, input_expr, E_mods, viscs):
 # Data generation from differential equation
 def calculate_int_diff_equation(time, response, input_lambda_or_network, coeff_vector, sparsity_mask, library_diff_order, input_type):
     
-    # time, response and coeff_vector should either all be tensors, or all be arrays.
-    if type(coeff_vector) is torch.Tensor:
-        coeff_vector = coeff_vector.detach()
+    # time and response should be either both tensors, or both arrays.
+    if type(time) is torch.Tensor:
         time_array = np.array(time.detach())
     else: # else numpy array
         time_array = time
