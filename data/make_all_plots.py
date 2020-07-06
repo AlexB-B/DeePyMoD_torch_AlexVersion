@@ -161,10 +161,12 @@ ax2.semilogy(steps_pt, data_pt[:, 1], color='blue', linestyle='None', marker='.'
 if number_graphs == 2:
     ax2.semilogy(steps_pt, data_pt[:, 2], color='deepskyblue', linestyle='None', marker='.', markersize=1, label='MSE 2')
 ax2.semilogy(steps_pt, data_pt[:, 2+mod], color='orange', linestyle='None', marker='.', markersize=1, label='PI')
-ax1.semilogy(steps_pt, data_pt[:, 4+mod], color='purple', linestyle='None', marker='.', markersize=1, label='Sign')
+ax2.semilogy(steps_pt, data_pt[:, 4+mod], color='purple', linestyle='None', marker='.', markersize=1, label='Sign')
 ax2.semilogy(steps_pt, data_pt[:, 0], color='red', linestyle='None', marker='.', markersize=1, label='Total')
 # ax2.set_xlim(left=0)
 ax2.tick_params(axis='y', which='both', left=False)
+
+ax1.set_ylim(bottom=10**-8) # Arbitrary cut-off. Applies to both axes as sharey=True.
 
 plt.tight_layout()
 plt.savefig(save_path+'loss_evolution.png', bbox_inches='tight')
@@ -219,7 +221,6 @@ ax2 = axes[1]
 series_idx = first_coeff_column_idx # Initial value
 for idx_diff_order in strain_mask_aligned:
     if idx_diff_order == 1:
-        ax2.plot(0, alpha=0, label=strain_labels[idx_diff_order]) # dummy to space legend in nice way
         continue
     ax2.plot(steps_pt, data_pt[:, series_idx], color=colors[idx_diff_order], linestyle='--', label=strain_labels[idx_diff_order])
     series_idx += 1
@@ -303,6 +304,13 @@ if input_type == 'Strain':
 else:
     target_array = strain_array
 
+# full_pred could be determined directly from model.network.
+# This would mean that time, pred and final_coeffs could all be tensors...
+# ...and allow for slightly more accurate Initial Values as determined...
+# ...by auto derivs, allowing for a slightly better recalc.
+# Early points skipped due to edge effects would be unchanged however and seeing...
+# ...as these are the only visible problem, I am not bothering to change anything.
+    
 if number_graphs == 1:    
     input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
     if input_type == 'Strain':
