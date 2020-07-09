@@ -504,7 +504,7 @@ def coeff_scaling_values(coeffs, time_sf, strain_sf, stress_sf):
 
     # apply independant variable scaling of alpha_n
     # No such scaling for zeroth order derivatives (index 0)
-    # alpha_LHS handled seperately so only 1 first order derivative
+    # alpha_LHS handled seperately so only 1 first order derivative handled here.
     # Higher order derivatives have more consistant pattern hence loop.
     stress_subarray[1] *= time_sf
     for idx in range(2, middle_index + 1):
