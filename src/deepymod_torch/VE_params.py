@@ -457,10 +457,40 @@ def true_coeffs_from_scaled(scaled_coeffs, time_sf, strain_sf, stress_sf, mask='
 
 
 def coeff_scaling_values(coeffs, time_sf, strain_sf, stress_sf):
+    '''
+    Calculates the 'alpha array' to scale coefficients based on the scaling of the associated data series ...
+    ... such that the equation residuals are unaffected.
+    This function assumes coefficients have been provided in a format that can be interpreted as a GDM.
+    
+    Paramters
+        coeffs: N or Nx1 array
+            The coefficients discovered or calculated for data series after the scale factors that follow were applied.
+            Coefficients begin with those associated increasing orders of derivative of strain ...
+            ... and then those associated with increasing orders of derivative of stress.
+            This function is only interested in the shape of this array.
+        time_sf: float
+            Scale factor applied to the time series for the viscoelastic data set.
+        strain_sf: float
+            As time_sf but for strain.
+        stress_sf: float
+            As time_sf but for stress.
+    
+    Returns
+        alpha_array: array of same shape as coeffs
+            The scale factors necassary to apply aligned with the coeffcient in the equivalent array, coeffs.
+            
+    Notes
+        For a derivative of a certain order, the magnitude of this term will be larger by the factor applied to the dependant variable (call t) ...
+        ... and smaller by the factor applied to the independant variable (call y), this factor applied a number of times equal to the order.
+        To make the coefficient term pair unchanged by the scaled data series, the reverse of this must occur to the coefficient.
+        Hence, alpha, the scale factor for the coeff is (t_sf)^diff_order / y_sf where _sf means scale factor.
+        However, The coefficient of the first derivative of strain must be 1, so all alpha so far calculated ...
+        ... must be divided by the alpha for the coefficient of this term, alpha_LHS.
+    '''
     
     middle_index = len(coeffs)//2
 
-    # calculate alpha_n for each term on RHS
+    # calculate alpha_n for each term on RHS. Prepare at initial scale factor of 1.
     alpha_n_array = np.ones(coeffs.shape)
 
     # split into subarrays that modify in place original due to mutability of arrays
@@ -469,27 +499,51 @@ def coeff_scaling_values(coeffs, time_sf, strain_sf, stress_sf):
     stress_subarray = alpha_n_array[middle_index:]
 
     # apply dependant variable scaling of alpha_n
-    strain_subarray *= strain_sf
-    stress_subarray *= stress_sf
+    strain_subarray /= strain_sf
+    stress_subarray /= stress_sf
 
     # apply independant variable scaling of alpha_n
-    stress_subarray[1] /= time_sf
+    # No such scaling for zeroth order derivatives (index 0)
+    # alpha_LHS handled seperately so only 1 first order derivative
+    # Higher order derivatives have more consistant pattern hence loop.
+    stress_subarray[1] *= time_sf
     for idx in range(2, middle_index + 1):
-        strain_subarray[idx-1] /= time_sf**idx
-        stress_subarray[idx] /= time_sf**idx
+        strain_subarray[idx-1] *= time_sf**idx
+        stress_subarray[idx] *= time_sf**idx
 
-    alpha_LHS = strain_sf/time_sf
+    alpha_LHS = time_sf/strain_sf
 
-    alpha_array = alpha_LHS/alpha_n_array
+    alpha_array = alpha_n_array/alpha_LHS
     
     return alpha_array
 
 
 def include_zero_coeffs(coeff_vector, sparsity_mask, library_diff_order):
+    '''
+    Terms eliminated from the library will not have associated coeffs. They effectively have coeffcients of 0.
+    This function explicitely fills these zero coefficients into the coeff_vector.
+    
+    Parameters
+        coeff_vector: N or Nx1 array
+            The coefficients discovered or calculated for data series after the scale factors that follow were applied.
+            Coefficients begin with those associated increasing orders of derivative of strain ...
+            ... and then those associated with increasing orders of derivative of stress.
+        sparsity_mask: N or Nx1 array
+            Identifies the terms associated with each coefficient.
+        library_diff_order: int
+            The maximum order of derivative calculated for both strain and stress to calculate the library in the model discovery process.
+            Allows interpretation of mask by providing understanding of which mask values begin to correspond to stress terms.
+    
+    Returns
+        full_coeff_array: M or Mx1 array with M = 2*library_diff_order + 1
+            This array still does not include a coefficient for the first derivative of strain.
+            Zero coeffs are inserted into coeff_vector wherever an effective coeff of 0 is present for teh full library of terms.
+    '''
     
     full_coeff_list = list(coeff_vector)
-    for term_id in range(library_diff_order*2 + 1): # term_ids are full mask
-        if term_id not in sparsity_mask:
+    # The generator used in this loop is the full sparsity mask for the entire library
+    for term_id in range(library_diff_order*2 + 1):
+        if term_id not in sparsity_mask: # If term eliminated
             full_coeff_list.insert(term_id, 0)
             
     full_coeff_array = np.array(full_coeff_list)
