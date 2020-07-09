@@ -9,6 +9,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
+import codecs
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 cwd = os.getcwd()
@@ -45,21 +46,26 @@ try:
     with open('model.pickle', 'rb') as file:
         model = pickle.load(file)
     library_config = model.configs.library
-except AttributeError:
-    with open('config_dict_list.txt', 'r') as file:
-        for line in file:
-            dict_start_index, dict_end_index = line.index("{"), line.index("}")
-            dict_str = line[dict_start_index:dict_end_index+1]
-            dict_str = dict_str.replace("<lambda>", "lambda").replace("<", "'").replace(">", "'")
-            line_dict = eval(dict_str)
-            if line.startswith('library'):
-                library_config = line_dict
-#             elif line.startswith('network'):
-#                 network_config = line_dict
-#             elif line.startswith('optim'):
-#                 optim_config = line_dict
-#             elif line.startswith('report'):
-#                 report_config = line_dict
+except:
+    try:
+        with open('model.deepmod', 'rb') as file:
+            model = pickle.load(file)
+        library_config = model.configs.library
+    except:
+        with open('config_dict_list.txt', 'r') as file:
+            for line in file:
+                dict_start_index, dict_end_index = line.index("{"), line.index("}")
+                dict_str = line[dict_start_index:dict_end_index+1]
+                dict_str = dict_str.replace("<lambda>", "lambda").replace("<", "'").replace(">", "'")
+                line_dict = eval(dict_str)
+                if line.startswith('library'):
+                    library_config = line_dict
+    #             elif line.startswith('network'):
+    #                 network_config = line_dict
+    #             elif line.startswith('optim'):
+    #                 optim_config = line_dict
+    #             elif line.startswith('report'):
+    #                 report_config = line_dict
     
 with open('treatment_info_list.txt', 'r') as file:
     for line in file:
@@ -96,10 +102,17 @@ event_file = next(filter(lambda filename: filename[:6] =='events', os.listdir(pa
 summary_iterator = EventAccumulator(str(path + '/' + event_file)).Reload()
 tags_pt = summary_iterator.Tags()['scalars']
 steps_pt = np.array([event.step for event in summary_iterator.Scalars(tags_pt[0])])
-# first_10001 = steps_pt <= 10001
-# steps_pt = steps_pt[first_10001]
 data_pt = np.array([[event.value for event in summary_iterator.Scalars(tag)] for tag in tags_pt]).T
-# data_pt = data_pt[first_10001, :]
+
+try:
+    cut
+except:
+    cut = input('Cut post threshold region to 10001 epochs? (Y/N)')
+    
+if cut in ('Y', 'y', 'Yes', 'yes', 'True'):
+    first_10001 = steps_pt <= 10001
+    steps_pt = steps_pt[first_10001]
+    data_pt = data_pt[first_10001, :]
 
 
             
@@ -143,26 +156,34 @@ if number_graphs > 1:
 else:
     MSE_1_label = 'MSE'
 
+import scipy.signal as signal
+
+window_length = 51
+polyorder = 1
+smoothed_data_main = signal.savgol_filter(data_main[:, :5+mod], window_length, polyorder, axis=0)
+smoothed_data_pt = signal.savgol_filter(data_pt[:, :5+mod], window_length, polyorder, axis=0)
+    
 ax1 = axes[0]
 ax1.set_xlabel('                Epochs')
 ax1.set_ylabel('Loss Magnitudes')
-ax1.semilogy(steps_main, data_main[:, 1], color='blue', linestyle='None', marker='.', markersize=1, label=MSE_1_label)
+ax1.semilogy(steps_main, smoothed_data_main[:, 1], color='blue', label=MSE_1_label)
 if number_graphs == 2:
-    ax1.semilogy(steps_main, data_main[:, 2], color='deepskyblue', linestyle='None', marker='.', markersize=1, label='MSE 2')
-ax1.semilogy(steps_main, data_main[:, 2+mod], color='orange', linestyle='None', marker='.', markersize=1, label='PI')
-ax1.semilogy(steps_main, data_main[:, 3+mod], color='green', linestyle='None', marker='.', markersize=1, label='L1')
-ax1.semilogy(steps_main, data_main[:, 4+mod], color='purple', linestyle='None', marker='.', markersize=1, label='Sign')
-ax1.semilogy(steps_main, data_main[:, 0], color='red', linestyle='None', marker='.', markersize=1, label='Total')
+    ax1.semilogy(steps_main, smoothed_data_main[:, 2], color='deepskyblue', label='MSE 2')
+ax1.semilogy(steps_main, smoothed_data_main[:, 2+mod], color='orange', label='PI')
+ax1.semilogy(steps_main, smoothed_data_main[:, 3+mod], color='green', label='L1')
+# ax1.semilogy(steps_main, smoothed_data_main[:, 4+mod], color='purple', label='Sign')
+ax1.semilogy(steps_main, smoothed_data_main[:, 0], color='red', label='Total')
 ax1.legend(numpoints=3, markerscale=5)
 ax1.set_xlim(right=1.005*steps_main[-1])
+# linestyle='None', marker='.', markersize=1, 
 
 ax2 = axes[1]
-ax2.semilogy(steps_pt, data_pt[:, 1], color='blue', linestyle='None', marker='.', markersize=1, label=MSE_1_label)
+ax2.semilogy(steps_pt, smoothed_data_pt[:, 1], color='blue', label=MSE_1_label)
 if number_graphs == 2:
-    ax2.semilogy(steps_pt, data_pt[:, 2], color='deepskyblue', linestyle='None', marker='.', markersize=1, label='MSE 2')
-ax2.semilogy(steps_pt, data_pt[:, 2+mod], color='orange', linestyle='None', marker='.', markersize=1, label='PI')
-ax2.semilogy(steps_pt, data_pt[:, 4+mod], color='purple', linestyle='None', marker='.', markersize=1, label='Sign')
-ax2.semilogy(steps_pt, data_pt[:, 0], color='red', linestyle='None', marker='.', markersize=1, label='Total')
+    ax2.semilogy(steps_pt, smoothed_data_pt[:, 2], color='deepskyblue', label='MSE 2')
+ax2.semilogy(steps_pt, smoothed_data_pt[:, 2+mod], color='orange', label='PI')
+# ax2.semilogy(steps_pt, smoothed_data_pt[:, 4+mod], color='purple', label='Sign')
+ax2.semilogy(steps_pt, smoothed_data_pt[:, 0], color='red', label='Total')
 # ax2.set_xlim(left=0)
 ax2.tick_params(axis='y', which='both', left=False)
 
@@ -353,7 +374,20 @@ if number_graphs == 1:
 else:
     ax.plot(time_array, target_array, label='Original Data', color='blue', linestyle='None', marker='.', markersize=1)
 ax.plot(time_array, unscaled_response_recalc.flatten(), label='Reformulation', color='darkorange', linestyle='--', linewidth=2)
+
+try:
+    inset_text
+except:
+    inset_text = input('If text is desired for the reformulation plot, state here. Otherwise leave blank.')
+    inset_text = codecs.decode(inset_text, 'unicode_escape') # Stupid line because by default, processing occurs such that any escape characters submitted by the user are themselves escaped. This line reverses that process.
+if inset_text:
+    ax.text(0.44, 0.35, inset_text, transform=ax.transAxes, fontsize=12, bbox={'facecolor': 'white', 'edgecolor': 'black'})
+
 ax.legend(numpoints=3, markerscale=5)
 
 plt.tight_layout()
 plt.savefig(save_path+'recalculation_from_coeffs.png', bbox_inches='tight')
+
+'''
+---True Model--- \n$0.98\epsilon + \epsilon_t + 0.015\epsilon_{tt} =$ \n$0.98\sigma + 0.50\sigma_t + 0.0049\sigma_{tt}$ \n\n---Discovered Model--- \n$0.055\epsilon + \epsilon_t + 1.0\epsilon_{tt} + 0.078\epsilon_{ttt} =$ \n$0.92\sigma_t + 0.48\sigma_{tt}$
+'''
