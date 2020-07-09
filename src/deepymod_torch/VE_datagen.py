@@ -7,138 +7,170 @@ import torch.autograd as auto
 import deepymod_torch.VE_params as VE_params
 
 
+######## MAJOR FUNCTIONALITY ########
+
 # Data generation using Boltzmann superposition integrals.
 def calculate_strain_stress(input_type, time_array, input_expr, E_mods, viscs, D_input_lambda=None):
+    '''
+    Main function for generating accurate viscoelastic response to provided manipulation for given mechanical model.
+    Uses the principle of Boltzmann superposition and as such is only valid for linear viscoelasticity.
+    In addition, only GMMs can be used in this framework to calculate responses to strain manipulations and...
+    ... only GKMs can be used to calculate responses to stress manipulations.
+    As such, the model parameters provided will be interpreted as defining a GMM if the specified input_type is 'Strain' and...
+    ... the model parameters provided will be interpreted as defining a GKM if the specified input_type is 'Stress'.
+    Solutions are obtained using numerical integration from the SciPy package.
     
-    if D_input_lambda:
+    Parameters
+        input_type: string
+            Must be 'Strain' or 'Stress'. Defines the manipulation type and mechanical model.
+        time_array: Nx1 array
+            Time series previously defined.
+            More time points does not equal greater accuracy but does equal greater computation time.
+        input_expr: SymPy Expression OR function
+            By default, the analytical expression for the manipulation is defined as a SymPy expression here.
+            Alternatively, if the kwarg D_input_lambda does not take its default, a function can be provided that...
+            ...returns the result of an analytical definition for the manipulation for a given time point.
+        E_mods: list
+            The elastic moduli partially defining the mechanical model being manipulated.
+            All but the first value are paired with a corresponding viscosity.
+        viscs: list
+            The viscosities partially defining the mechanical model being manipulated.
+            Always one element shorter than E_mods.
+        D_input_lambda: function; OPTIONAL
+            Returns the result of the first derivative of the expression used to define the manipulation profile for any time point.
+            If None, input_expr is assumed to have been symbolically defined and as such...
+            ...the derivative is determined in this fashion.
+    
+    Returns
+        strain_array: array of same shape as time_array
+        stress_array: array of same shape as time_array
+    '''
+    
+    if D_input_lambda: # Checks if provided
         input_lambda = input_expr
-    else:
+    else: # Default behavior is to reach an analytical expression for the first time derivative of manipulation using SymPy
         t = sym.symbols('t', real=True)
         D_input_expr = input_expr.diff(t)
         
         input_lambda = sym.lambdify(t, input_expr)
         D_input_lambda = sym.lambdify(t, D_input_expr)
     
-    # The following function interprets the provided model parameters differently depending on the input_type.
-    # If the input_type is 'Strain' then the parameters are assumed to refer to a Maxwell model, whereas
-    # if the input_type is 'Stress' then the parameters are assumed to refer to a Kelvin model.
+    # Relaxation and creep functions occupy identical positions in mathematics. Whichever is needed depending on input_type...
+    # ... is created as a lambda function with input time, and explicit use of model parameters.
     relax_creep_lambda = relax_creep(E_mods, viscs, input_type)
-    
-    if relax_creep_lambda == False:
-        return False, False
     
     start_time_point = time_array[0]
     
-    integrand_lambda = lambda x, t: relax_creep_lambda(t-x)*D_input_lambda(x)
-    integral_lambda = lambda t: integ.quad(integrand_lambda, start_time_point, t, args=(t))[0]
+    integrand_lambda = lambda x, t: relax_creep_lambda(t-x)*D_input_lambda(x) # x is t', or dummy variable of integration.
+    integral_lambda = lambda t: integ.quad(integrand_lambda, start_time_point, t, args=(t))[0] # integral to perform at each time point.
     
     output_array = np.array([])
     input_array = np.array([])
     for time_point in time_array:
+        # Term outside integral, corrects for discontinuity between assumed zero manipulation history and beginning of here defined manipulation.
         first_term = input_lambda(start_time_point)*relax_creep_lambda(time_point-start_time_point)
-        second_term = integral_lambda(time_point)
-        output_array = np.append(output_array, first_term + second_term)
-        input_array = np.append(input_array, input_lambda(time_point))
-    
-    if input_type == 'Strain':
-        strain_array = input_array
-        stress_array = output_array
-    else:
-        strain_array = output_array
-        stress_array = input_array
         
-    strain_array = strain_array.reshape(time_array.shape)
-    stress_array = stress_array.reshape(time_array.shape)
+        # Integral term. Response to here defined manipulation.
+        second_term = integral_lambda(time_point)
+        
+        output_array = np.append(output_array, first_term + second_term)
+    
+    input_array = input_lambda(time_array)
+    
+    input_array = input_array.reshape(time_array.shape)
+    output_array = output_array.reshape(time_array.shape)
+    
+    # Purely arrangement of returned objects.
+    if input_type == 'Strain':
+        strain_array, stress_array = input_array, output_array
+    else:
+        strain_array, stress_array = output_array, input_array
     
     return strain_array, stress_array
 
 
 def relax_creep(E_mods, viscs, input_type):
+    '''
+    Incorporates mechanical model definition and manipulation type into function for kernal within Boltzmann superposition integral.
+    Function returned is either that called the relaxation function (input_type='Strain') or the creep function (input_type='Stress'), the result being used analagously.
+    If the input_type is 'Strain' then the parameters are assumed to refer to a Maxwell model, whereas
+    if the input_type is 'Stress' then the parameters are assumed to refer to a Kelvin model.
     
-    # The following function interprets the provided model parameters differently depending on the input_type.
-    # If the input_type is 'Strain' then the parameters are assumed to refer to a Maxwell model, whereas
-    # if the input_type is 'Stress' then the parameters are assumed to refer to a Kelvin model.
-    # The equations used thus allow the data to be generated according to the model now designated.
+    Parameters
+        E_mods: list
+            The elastic moduli partially defining the mechanical model being manipulated.
+            All but the first value are paired with a corresponding viscosity.
+        viscs: list
+            The viscosities partially defining the mechanical model being manipulated.
+            Always one element shorter than E_mods.
+        input_type: string
+            Must be 'Strain' or 'Stress'. Defines the manipulation type and mechanical model.
+            
+    Returns
+        relax_creep_lambda: lambda function
+            With single parameter of time.
+    '''
     
-    E_mods_1plus_array = np.array(E_mods[1:]).reshape(-1,1)
+    # Converted to arrays for easy computation of relevant tau (characteristic times) values
+    E_mods_1plus_array = np.array(E_mods[1:]).reshape(-1,1) # So-called 'equillibrium' constant incorporated differently.
     viscs_array = np.array(viscs).reshape(-1,1)
     
     taus = viscs_array/E_mods_1plus_array
     
     if input_type == 'Strain':
+        # Relaxation formulation
         relax_creep_lambda = lambda t: E_mods[0] + np.sum(np.exp(-t/taus)*E_mods_1plus_array)
-    elif input_type == 'Stress':
+    else: # input_type == 'Stress'
+        # Creep formulation
         relax_creep_lambda = lambda t: 1/E_mods[0] + np.sum((1-np.exp(-t/taus))/E_mods_1plus_array)
-    else:
-        print('Incorrect input_type')
-        relax_creep_lambda = False
     
     return relax_creep_lambda
 
 
-# Data generation using finite difference approx of models.
-def calculate_strain_finite_difference(time_array, input_expr, E_mods, viscs):
-    # input is stress, model is GKM
-    
-    E_mods_1plus_array = np.array(E_mods[1:]).reshape(-1,1)
-    viscs_array = np.array(viscs).reshape(-1,1)
-    
-    delta_t = time_array[1] - time_array[0]
-    
-    stress = np.array([])
-    strain_i = np.zeros(viscs_array.shape)
-    strain = np.array([])
-    for t in time_array:
-        stress = np.append(stress, input_expr(t))
-        # In below line, need to remember that stress[-1] refers to stress(t) whereas strain_i[:, -1] refers to strain_i(t-delta_t) as stress is one element longer after previous line
-        strain_i = np.append(strain_i, (delta_t*stress[-1] + viscs_array*strain_i[:, -1])/(delta_t*E_mods_1plus_array + viscs_array), axis=1)
-        # Now strain_i[:, -1] refers to strain_i(t)
-        strain = np.append(strain, stress[-1]/E_mods[0] + np.sum(strain_i[:, -1]))
-    
-    stress = stress.reshape(time_array.shape)
-    strain = strain.reshape(time_array.shape)
-    
-    return strain, stress
-
-
-def calculate_stress_finite_difference(time_array, input_expr, E_mods, viscs):
-    # input is strain, model is GMM
-    
-    E_mods_1plus_array = np.array(E_mods[1:]).reshape(-1,1)
-    viscs_array = np.array(viscs).reshape(-1,1)
-    taus = viscs_array/E_mods_1plus_array
-    
-    delta_t = time_array[1] - time_array[0]
-
-    strain = np.zeros(1)
-    stress = np.array([])
-    stress_i = np.zeros(viscs_array.shape)
-    for t in time_array:
-        strain = np.append(strain, input_expr(t))
-        # In below line, need to remember that strain[-1] refers to strain(t) and strain[-2] refers to strain(t-delta_t), whereas stress_i[:, -1] refers to stress_i(t-delta_t) as strain is one element longer after previous line.
-        stress_i = np.append(stress_i, (E_mods_1plus_array*(strain[-1] - strain[-2]) + stress_i[:, -1])/(1 + delta_t/taus), axis=1)
-        # Now stress_i[:, -1] refers to stress_i(t)
-        stress = np.append(stress, strain[-1]*E_mods[0] + np.sum(stress_i[:, -1]))
-    
-    stress = stress.reshape(time_array.shape)
-    strain = strain[1:].reshape(time_array.shape)
-    
-    return strain, stress
-
-
 # Data generation from differential equation
 def calculate_int_diff_equation(time, response, input_lambda_or_network, coeff_vector, sparsity_mask, library_diff_order, input_type):
+    '''
+    Alternative function for generating viscoelastic response to provided manipulation for given mechanical model.
+    Compared to calculate_strain_stress, this function is more versatile but less accurate.
+    Solves differential equation (GDM) directly using numerical methods.
+    Not totally from first principles as prior of some initial values of the response are required.
+    
+    Parameters
+        time: Nx1 Tensor OR array (must match response)
+            Time series over which response should be calculated.
+            More time points BOTH equals greater accuracy and greater computation time.
+            Specify as Tensor if graph then exists to response, allowing automatic differentiation to be used when calculating initial values.
+            Otherwise numerical derivatives will be used. Tensors are preferred.
+        response: Nx1 Tensor OR array (must match time)
+            Already defined response series used PURELY for initial values.
+        input_lambda_or_network: function OR nn.Module from PyTorch with first output as manipulation fit
+            Method of calculating manipulation profile and manipulation derivatives.
+            Preferred is function, providing direct analytical description of manipulation, derivatives obtained numerically.
+            In case of noisy manipulation, neural network mediated fit can be used instead, with automatic derivatives.
+        coeff_vector: Mx1 array OR detached Tensor
+            Coefficients partially defining model discovered.
+        sparsity_mask: M element array OR detached Tensor
+            Mask identifying the terms associated with each coefficient.
+        library_diff_order: int
+            The maximum order of derivative calculated for both strain and stress to calculate the library in the model discovery process.
+            Allows interpretation of sparsity_mask by providing understanding of terms associated with mask values before threshold.
+        input_type: string
+            Must be 'Strain' or 'Stress'. Unlike calculate_strain_stress, no mechanical model is assumed.
+        
+    Returns
+        calculated_response_array: Nx1 array
+    '''
     
     # time and response should be either both tensors, or both arrays.
     if type(time) is torch.Tensor:
-        time_array = np.array(time.detach())
+        time_array = np.array(time.detach()) # time as tensor retained for initial values
     else: # else numpy array
         time_array = time
     
     coeff_array = np.array(coeff_vector)
     mask_array = np.array(sparsity_mask)
     
-    # Function returns masks and arrays in format such that mask values correspond to diff order etc.
+    # Function returns coeffs and masks in standardized format such that mask values correspond to diff order etc.
     strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeff_array, mask_array, library_diff_order)
     
     if input_type == 'Strain':
@@ -159,27 +191,33 @@ def calculate_int_diff_equation(time, response, input_lambda_or_network, coeff_v
     max_input_diff_order = max(input_mask)
     max_response_diff_order = max(response_mask)
     
+    # Defines ODE to solve. Function as required by odeint to determine derivative of each variable for a given time point.
+    # The 'variables' here are not strain and stress.
+    # Each derivative of the response up to and not including the highest is treated as an independant variable from the perspective of odeint.
+    # The relationship between them must be specified in the function.
+    # The derivatives for the manipulation are independantly calculated.
     def calc_dU_dt(U, t):
-        # U is list (seems to be converted to array before injection) of response and increasing orders of derivative of response.
+        # U is an array of response and increasing orders of derivative of response.
+        # t is a time point decided by odeint, it does not necessarily come from time.
         # Returns list of derivative of each input element in U.
         
+        # Manipulation derivatives
         if type(input_lambda_or_network) is type(lambda:0):
-            # Calculate numerical derivatives of manipualtion variable by spooling a dummy time series around t.
+            # Calculate numerical derivatives of manipulation variable by spooling a dummy time series around t.
             input_derivs = num_derivs_single(t, input_lambda_or_network, max_input_diff_order)
         else: # network
             t_tensor = torch.tensor([t], dtype=torch.float32, requires_grad=True)
-            input_derivs = [input_lambda_or_network(t_tensor)[0]] # if I ever supply module, is because voltage is 1 of 2 outputs of NN. The [0] here selects the voltage
+            input_derivs = [input_lambda_or_network(t_tensor)[0]] # The [0] here selects the manipulation.
             for _ in range(max_input_diff_order):
+                # Calculate automatic derivatives of manipulation variable
                 input_derivs += [auto.grad(input_derivs[-1], t_tensor, create_graph=True)[0]]
 
             input_derivs = np.array([input_deriv.item() for input_deriv in input_derivs])
         
-        # Use masks to select manipulation terms from numerical work above...
-        # ...and response terms from function parameter, considering ladder of derivative substitions.
+        # Use masks to select manipulation terms ...
+        # ...and response terms from function argument, considering ladder of derivative substitions.
         # Concatenate carefully to align with coefficient order.
-#         input_terms = np.array([input_derivs[mask_value] for mask_value in input_mask])
         input_terms = input_derivs[input_mask]
-#         response_terms = np.array([U[mask_value] for mask_value in response_mask[:-1]])
         response_terms = U[response_mask[:-1]]
         terms_array = np.concatenate((input_terms, response_terms))
         
@@ -190,34 +228,228 @@ def calculate_int_diff_equation(time, response, input_lambda_or_network, coeff_v
         
         return dU_dt
     
-    start_index = max_response_diff_order # If want to start recalc at different point modify start_index NOT max_response_diff_order. Default behaviour is to take same value but 2 different purposes.
-    # Initial values of derivatives. IVs taken a few steps into the response curve to avoid edge effects.
+    # To avoid edge effects, increasingly pronounced in higher derivatives, initial values are picked a few elements from the extremes.
+    start_index = max_response_diff_order
+    
+    # Initial values of derivatives.
     if type(time) is torch.Tensor:
         # Initial values of response and response derivatives determined using torch autograd.
         IVs = [response[start_index]]
         for _ in range(max_response_diff_order-1):
-            IVs += [auto.grad(IVs[-1], time, create_graph=True)[0][start_index]]
+            IVs += [auto.grad(IVs[-1], time, create_graph=True)[0][start_index]] # result of autograd will have a single non-zero element at start_index
 
         IVs = [IV.item() for IV in IVs]
         
-        # The few skipped values from edge effect avoidance tacked on again.
+        # The few skipped values from edge effect avoidance tacked on again - prepped.
         calculated_response_array_initial = np.array(response[:start_index].detach()).flatten()
     else: # else numpy array
         # Initial values of response and response derivatives determined using numpy gradient.
-        response_derivs = num_derivs(response, time_array, max_response_diff_order-1)[start_index, :]
+        response_derivs = num_derivs(response, time_array, max_response_diff_order-1)[start_index, :] # Keep only row of start_index
         IVs = list(response_derivs)
         
-        # The few skipped values from edge effect avoidance tacked on again.
+        # The few skipped values from edge effect avoidance tacked on again - prepped.
         calculated_response_array_initial = response[:start_index].flatten()
     
+    # odeint is blind to clipped initial extreme
     reduced_time_array = time_array[start_index:].flatten()
     
-    calculated_response_array = integ.odeint(calc_dU_dt, IVs, reduced_time_array)[:, 0]
+    calculated_response_array = integ.odeint(calc_dU_dt, IVs, reduced_time_array)[:, 0] # Want only first column (response) not series for derivatives of response
     
+    # The few skipped values from edge effect avoidance tacked on again - done.
     calculated_response_array = np.concatenate((calculated_response_array_initial, calculated_response_array)).reshape(-1, 1)
     
     return calculated_response_array
 
+
+def align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order):
+    '''
+    Restructures given set of coeffs wrt an understanding of the associated terms.
+    Result is a coeffs vector and mask vector for each of strain and stress where...
+    ...the mask values indicate precisely the order of derivative of the associated term.
+    The strain part of this also contains the coeff of 1 associated with the first derivative.
+    
+    Parameters
+        coeff_vector: 1D or 2D array of N elements
+            Coefficients partially defining model of interest.
+        sparsity_mask: 1D array of N elements
+            Mask identifying the terms associated with each coefficient.
+        library_diff_order: int
+            The maximum order of derivative calculated for both strain and stress to calculate the library of terms.
+            Allows interpretation of sparsity_mask by providing understanding of terms associated with mask values.
+            
+    Returns
+        strain_coeffs_mask: 2-tuple
+            Tuple like (coeffs, mask) where each element is a 1D array.
+        stress_coeffs_mask: 2-tuple
+            As strain_coeffs_mask.
+    '''
+    
+    # Create boolean arrays to slice mask into strain and stress parts
+    first_stress_mask_value = library_diff_order
+    is_strain = sparsity_mask < first_stress_mask_value
+    is_stress = sparsity_mask >= first_stress_mask_value
+    
+    # Slice mask and coeff values and shift stress mask so that mask values always refer to diff order. (Only complete for Stress here.)
+    strain_mask = sparsity_mask[is_strain]
+    strain_coeffs = list(coeff_vector[is_strain].flatten())
+    stress_mask = list(sparsity_mask[is_stress] - first_stress_mask_value)
+    stress_coeffs = list(coeff_vector[is_stress].flatten())
+    
+    # Adjust strain mask and coeffs to account for missing first strain derivative.
+    # Mask values above 0 are shifted up and a mask value of 1 added so that mask values always refer to diff order.
+    strain_mask_stay = list(strain_mask[strain_mask < 1])
+    strain_mask_shift = list(strain_mask[strain_mask > 0] + 1)
+    strain_t_idx = len(strain_mask_stay)
+    strain_mask = strain_mask_stay + [1] + strain_mask_shift
+    # A coeff of 1 is added for the coeff of the first strain derivative.
+    strain_coeffs.insert(strain_t_idx, 1)
+    
+    # Arrays in, arrays out.
+    strain_coeffs_mask = np.array(strain_coeffs), np.array(strain_mask, dtype=int)
+    stress_coeffs_mask = np.array(stress_coeffs), np.array(stress_mask, dtype=int)
+    
+    return strain_coeffs_mask, stress_coeffs_mask
+
+
+#Data Validation routine
+def equation_residuals(time_array, strain_array, stress_array, coeffs, sparsity_mask='full', diff_order='full'):
+    '''
+    Quantifies the agreement of a given strain/stress differential equation with a data series at each point in the data series.
+    All derivatives specified by the model are calculated numerically and the products of each coefficient and associated term...
+    ...are summed or subtracted as appropriate to determine the the degree to which the stated equality is invalid at each point.
+    The default behavior is to assume adherence to the GDM structure with no skipped orders of derivative and...
+    ...the same highest order of derivative for both strain and stress. In this case, coeffs is understood without the help of the kwargs.
+    
+    Parameters
+        time_array: Nx1 array
+            Series of time stamps for each data point. Must be consecutive.
+        strain_array: Nx1 array
+            Series of strain values for each point in time.
+        stress_array: Nx1 array
+            Series of stress values for each point in time.
+        coeffs: 1D or 2D M element array
+            Coefficients partially defining model of interest. Is suffcient to effectively fully define model if no contradictory mask is specified.
+        sparsity_mask: 1D M element array; OPTIONAL
+             Mask identifying the terms associated with each coefficient.
+        diff_order: int; OPTIONAL
+            The maximum order of derivative calculated for both strain and stress to calculate the library of terms.
+            Allows interpretation of sparsity_mask by providing understanding of terms associated with mask values.
+        
+    Returns
+        residuals: Nx1 array
+    '''
+    
+    # If default, the mask and diff_order appropriate to coeffs adhering to a GDM is generated.
+    if diff_order == 'full': # this and sparsity_mask should either both be default, or both be specified.
+        sparsity_mask = np.arange(len(coeffs))
+        diff_order = len(coeffs)//2
+    
+    # In case they are tensors. Tensors must still be detached as arguements.
+    time_array, strain_array, stress_array = np.array(time_array), np.array(strain_array), np.array(stress_array)
+    coeffs, sparsity_mask = np.array(coeffs, dtype=float), np.array(sparsity_mask)
+    
+    # Function returns coeffs and masks in standardized format such that mask values correspond to diff order etc.
+    strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeffs, sparsity_mask, diff_order)
+    strain_coeffs, strain_mask = strain_coeffs_mask
+    stress_coeffs, stress_mask = stress_coeffs_mask
+    
+    # strain coeff-term products will be subtracted and so the negatives of the strain coeffs are used allowing everything to be summed.
+    coeffs_array = np.concatenate((-strain_coeffs, stress_coeffs)).reshape(-1,1)
+    
+    # Calculate all numerical derivatives for full library (all derivatives at each point in time series).
+    strain_theta = num_derivs(strain_array, time_array, diff_order)
+    stress_theta = num_derivs(stress_array, time_array, diff_order)
+    
+    # Build sparse library only including derivatives specified by masks.
+    num_theta = np.concatenate((strain_theta[:, strain_mask], stress_theta[:, stress_mask]), axis=1)
+    
+    # Matrix multiplication to calculate all coeff-term products and sum at each time point.
+    residuals = num_theta @ coeffs_array
+        
+    return residuals
+
+
+# Numerical derivatives using NumPy
+def num_derivs(dependent_data, independent_data, diff_order):
+    '''
+    Utility function for calculating increasing orders of numerical derivatives for a given independant and dependant data series.
+    
+    Parameters
+        dependent_data: 1D N or 2D Nx1 array
+            Data corresponding to the independant values at each point.
+        independent_data: 1D N or 2D Nx1 array
+            Derivatives will be calculated across this range. Must be consecutive values.
+        diff_order: int
+            Specified maximum order of derivative to be calculated and incorporated into returned array.
+        
+    Returns
+        data_derivs: Nx(diff_order+1) array
+            Includes zeroth order of derivative (dependent_data) as first column in matrix returned.
+    '''
+    
+    data_derivs = dependent_data.reshape(-1, 1)
+    
+    # Calculate array of derivatives and append as additional column to previous array to build up matrix to return.
+    # Recursively calculate derivatives on previous derivatives to acheive higher order derivatives.
+    for _ in range(diff_order):
+        data_derivs = np.append(data_derivs, np.gradient(data_derivs[:, -1].flatten(), independent_data.flatten()).reshape(-1,1), axis=1)
+    
+    return data_derivs
+
+
+def num_derivs_single(t, input_lambda, diff_order, num_girth=1, num_depth=101):
+    '''
+    Calculates numerical derivatives for a single point on a defined curve.
+    num_derivs relies on a detailed series of points to accurately calculate derivatives numerically, especially higher derivatives.
+    If an analytical expression is known, and derivatives are required for a single independant point, this method spools out...
+    ...a series of points on the curve defined by the expression around the single point to calculate derivatives at this point.
+    If an analytical expression for each order of derivative desired is known, this method is unnecessary and relatively inaccurate.
+    However if these expressions are not known, this method can still be used.
+    
+    Parameters
+        t: float
+            The independant time point for which the derivatives are desired.
+        input_lambda: function (1->1)
+            Returns result of evaluating analytical expression describing curve for which derivatives will be calculated.
+        diff_order: int
+            Specified maximum order of derivative to be calculated and incorporated into returned array.
+        num_girth: int; OPTIONAL
+            Increasing improves accuracy of derivatives at cost of computation time.
+            Specifies absolute range around t to evaluate input_lambda.
+            Is modified by diff_order for real range used.
+        num_depth: int; OPTIONAL
+            Increasing improves accuracy of derivatives at cost of computation time.
+            Specifies number of points within range for which evaluation of input_lambda is performed.
+            Should be odd, but will be adjusted if not.
+        
+    Returns
+        input_derivs: 1D (diff_order+1) element array
+            Includes zeroth order of derivative (input_lambda(t)) as first element in vector returned.
+    '''
+    
+    # Higher derivs need further reaching context for accuracy.
+    mod_num_girth = num_girth*diff_order
+    
+    # num_depth must end up odd. If an even number is provided, num_depth ends up as provided+1.
+    num_half_depth = num_depth // 2
+    num_depth = 2*num_half_depth + 1
+    
+    # To calculate numerical derivs, spool out time points around point of interest, calculating associated input values...
+    t_temp = np.linspace(t-mod_num_girth, t+mod_num_girth, num_depth)
+    input_array = input_lambda(t_temp) # Divide by zeros will probably result in Inf values which could cause derivative issues
+
+    # ... Then calc all num derivs for all spooled time array, but retain only row of interest.
+    input_derivs = num_derivs(input_array, t_temp, diff_order)[num_half_depth, :]
+    
+    return input_derivs
+
+
+
+
+
+
+
+######## EXTENDED FUNCTIONALITY ########
 
 def calculate_int_diff_equation_initial(time_array, input_lambda, E, eta, input_type, model):
     
@@ -397,35 +629,6 @@ def generate_finite_difference_approx_deriv(sym_string, diff_order):
     return expr, syms, delta
 
 
-def align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order):
-    
-    # Create boolean arrays to slice mask into strain and stress parts
-    first_stress_mask_value = library_diff_order
-    is_strain = sparsity_mask < first_stress_mask_value
-    is_stress = sparsity_mask >= first_stress_mask_value
-    
-    # Slice mask and coeff values and shift stress mask so that mask values always refer to diff order.
-    strain_mask = sparsity_mask[is_strain]
-    strain_coeffs = list(coeff_vector[is_strain].flatten())
-    stress_mask = list(sparsity_mask[is_stress] - first_stress_mask_value)
-    stress_coeffs = list(coeff_vector[is_stress].flatten())
-    
-    # Adjust strain mask and coeffs to account for missing first strain derivative.
-    # Mask values above 0 are shifted up and a mask value of 1 added so that mask values always refer to diff order.
-    strain_mask_stay = list(strain_mask[strain_mask < 1])
-    strain_mask_shift = list(strain_mask[strain_mask > 0] + 1)
-    strain_t_idx = len(strain_mask_stay)
-    strain_mask = strain_mask_stay + [1] + strain_mask_shift
-    # A coeff of 1 is added for the coeff of the first strain derivative.
-    strain_coeffs.insert(strain_t_idx, 1)
-    
-    # Arrays in, arrays out.
-    strain_coeffs_mask = np.array(strain_coeffs), np.array(strain_mask, dtype=int)
-    stress_coeffs_mask = np.array(stress_coeffs), np.array(stress_mask, dtype=int)
-    
-    return strain_coeffs_mask, stress_coeffs_mask
-
-
 # Wave packet lambda generation
 def wave_packet_lambdas_sum(freq_max, freq_step, std_dev, amp):
     
@@ -472,88 +675,3 @@ def wave_packet_lambdas_integ(freq_max, std_dev, amp):
     torch_output_lambda = lambda t_tensor: amp*torch.stack([torch_output_lambda_single(t) for t in t_tensor])
     
     return output_lambda, d_output_lambda, torch_output_lambda
-
-
-#Data Validation routine
-def equation_residuals(time_array, strain_array, stress_array, coeffs, sparsity_mask='full', diff_order='full'):
-    
-    if diff_order == 'full': # this and sparsity_mask should either both be default, or both be specified.
-        sparsity_mask = np.arange(len(coeffs))
-        diff_order = len(coeffs)//2
-    
-    # In case they are tensors. Tensors must still be detached as arguements.
-    time_array, strain_array, stress_array = np.array(time_array), np.array(strain_array), np.array(stress_array)
-    coeffs, sparsity_mask = np.array(coeffs).astype(float), np.array(sparsity_mask)
-    
-    strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeffs, sparsity_mask, diff_order)
-    strain_coeffs, strain_mask = strain_coeffs_mask[0], strain_coeffs_mask[1]
-    stress_coeffs, stress_mask = stress_coeffs_mask[0], stress_coeffs_mask[1]
-    
-    coeffs_array = np.concatenate((-strain_coeffs, stress_coeffs)).reshape(-1,1)
-    
-    strain_theta = num_derivs(strain_array, time_array, diff_order)
-    stress_theta = num_derivs(stress_array, time_array, diff_order)
-    
-    num_theta = np.concatenate((strain_theta[:, strain_mask], stress_theta[:, stress_mask]), axis=1)
-
-    residuals = num_theta @ coeffs_array
-        
-    return residuals
-
-
-def equation_residuals_auto(theta, strain_t, coeffs, sparsity_mask='full', diff_order='full'):
-    
-    if diff_order == 'full': # this and sparsity_mask should either both be default, or both be specified.
-        sparsity_mask = np.arange(len(coeffs))
-        diff_order = len(coeffs)//2
-    
-    # In case they are tensors. Tensors must still be detached as arguements.
-    theta, strain_t = np.array(theta), np.array(strain_t)
-    coeffs, sparsity_mask = np.array(coeffs).astype(float), np.array(sparsity_mask)
-    
-    strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeffs, sparsity_mask, diff_order)
-    strain_coeffs, strain_mask = strain_coeffs_mask[0], strain_coeffs_mask[1]
-    stress_coeffs, stress_mask = stress_coeffs_mask[0], stress_coeffs_mask[1]
-    
-    coeffs_array = np.concatenate((-strain_coeffs, stress_coeffs)).reshape(-1,1)
-    
-    strain_theta = np.concatenate((-theta[:, 0:1], strain_t, -theta[:, 1:diff_order]), axis=1)
-    stress_theta = theta[:, diff_order:]
-    
-    reduced_strain_theta = [strain_theta[:, mask_value:mask_value+1] for mask_value in strain_mask]
-    reduced_stress_theta = [stress_theta[:, mask_value:mask_value+1] for mask_value in stress_mask]
-    num_theta = np.concatenate(reduced_strain_theta + reduced_stress_theta, axis=1)
-    
-    residuals = num_theta @ coeffs_array
-        
-    return residuals
-
-
-# Numerical derivatives using NumPy
-def num_derivs(dependent_data, independent_data, diff_order):
-    
-    data_derivs = dependent_data.copy()
-    data_derivs = data_derivs.reshape(-1, 1)
-    for _ in range(diff_order):
-        data_derivs = np.append(data_derivs, np.gradient(data_derivs[:, -1].flatten(), independent_data.flatten()).reshape(-1,1), axis=1)
-    
-    return data_derivs
-
-
-def num_derivs_single(t, input_lambda, diff_order, num_girth=1, num_depth=101):
-    
-    # Higher derivs need further reaching context for accuracy.
-    mod_num_girth = num_girth*diff_order
-    
-    # num_depth must end up odd. If an even number is provided, num_depth ends up as provided+1.
-    num_half_depth = num_depth // 2
-    num_depth = 2*num_half_depth + 1
-    
-    # To calculate numerical derivs, spool out time points around point of interest, calculating associated input values...
-    t_temp = np.linspace(t-mod_num_girth, t+mod_num_girth, num_depth)
-    input_array = input_lambda(t_temp) # Divide by zeros will probably result in Inf values which could cause derivative issues
-
-    # ... Then calc all num derivs for all spooled time array, but retain only row of interest.
-    input_derivs = num_derivs(input_array, t_temp, diff_order)[num_half_depth, :]
-    
-    return input_derivs
