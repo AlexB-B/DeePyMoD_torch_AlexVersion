@@ -1,6 +1,5 @@
 import numpy as np
 import scipy.integrate as integ
-import sympy as sym
 import torch
 import torch.autograd as auto
 
@@ -10,7 +9,7 @@ import deepymod_torch.VE_params as VE_params
 ######## MAJOR FUNCTIONALITY ########
 
 # Data generation using Boltzmann superposition integrals.
-def calculate_strain_stress(input_type, time_array, input_expr, E_mods, viscs, D_input_lambda=None):
+def calculate_strain_stress(input_type, time_array, input_lambda, d_input_lambda, E_mods, viscs):
     '''
     Main function for generating accurate viscoelastic response to provided manipulation for given mechanical model.
     Uses the principle of Boltzmann superposition and as such is only valid for linear viscoelasticity.
@@ -26,34 +25,20 @@ def calculate_strain_stress(input_type, time_array, input_expr, E_mods, viscs, D
         time_array: Nx1 array
             Time series previously defined.
             More time points does not equal greater accuracy but does equal greater computation time.
-        input_expr: SymPy Expression OR function
-            By default, the analytical expression for the manipulation is defined as a SymPy expression here.
-            Alternatively, if the kwarg D_input_lambda does not take its default, a function can be provided that...
-            ...returns the result of an analytical definition for the manipulation for a given time point.
+        input_lambda: function
+            Returns the result of an analytical definition for the manipulation for a given time point.
+        d_input_lambda: function
+            Returns the result of the first derivative of the expression used to define the manipulation profile for any time point.
         E_mods: list
             The elastic moduli partially defining the mechanical model being manipulated.
             All but the first value are paired with a corresponding viscosity.
         viscs: list
             The viscosities partially defining the mechanical model being manipulated.
             Always one element shorter than E_mods.
-        D_input_lambda: function; OPTIONAL
-            Returns the result of the first derivative of the expression used to define the manipulation profile for any time point.
-            If None, input_expr is assumed to have been symbolically defined and as such...
-            ...the derivative is determined in this fashion.
     
     Returns
-        strain_array: array of same shape as time_array
-        stress_array: array of same shape as time_array
+        response_array: array of same shape as time_array
     '''
-    
-    if D_input_lambda: # Checks if provided
-        input_lambda = input_expr
-    else: # Default behavior is to reach an analytical expression for the first time derivative of manipulation using SymPy
-        t = sym.symbols('t', real=True)
-        D_input_expr = input_expr.diff(t)
-        
-        input_lambda = sym.lambdify(t, input_expr)
-        D_input_lambda = sym.lambdify(t, D_input_expr)
     
     # Relaxation and creep functions occupy identical positions in mathematics. Whichever is needed depending on input_type...
     # ... is created as a lambda function with input time, and explicit use of model parameters.
@@ -61,10 +46,10 @@ def calculate_strain_stress(input_type, time_array, input_expr, E_mods, viscs, D
     
     start_time_point = time_array[0]
     
-    integrand_lambda = lambda x, t: relax_creep_lambda(t-x)*D_input_lambda(x) # x is t', or dummy variable of integration.
+    integrand_lambda = lambda x, t: relax_creep_lambda(t-x)*d_input_lambda(x) # x is t', or dummy variable of integration.
     integral_lambda = lambda t: integ.quad(integrand_lambda, start_time_point, t, args=(t))[0] # integral to perform at each time point.
     
-    output_array = np.array([])
+    response_array = np.array([])
     input_array = np.array([])
     for time_point in time_array:
         # Term outside integral, corrects for discontinuity between assumed zero manipulation history and beginning of here defined manipulation.
@@ -73,20 +58,11 @@ def calculate_strain_stress(input_type, time_array, input_expr, E_mods, viscs, D
         # Integral term. Response to here defined manipulation.
         second_term = integral_lambda(time_point)
         
-        output_array = np.append(output_array, first_term + second_term)
+        response_array = np.append(response_array, first_term + second_term)
+        
+    response_array = response_array.reshape(time_array.shape)
     
-    input_array = input_lambda(time_array)
-    
-    input_array = input_array.reshape(time_array.shape)
-    output_array = output_array.reshape(time_array.shape)
-    
-    # Purely arrangement of returned objects.
-    if input_type == 'Strain':
-        strain_array, stress_array = input_array, output_array
-    else:
-        strain_array, stress_array = output_array, input_array
-    
-    return strain_array, stress_array
+    return response_array
 
 
 def relax_creep(E_mods, viscs, input_type):
