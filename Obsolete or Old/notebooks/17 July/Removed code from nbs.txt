@@ -150,3 +150,71 @@ else:
     
 
 plt.plot(time_array.flatten(), response_recalc_at_fd.flatten(), label='recalc_fd', marker='.', markersize=1, linestyle='None')
+
+
+
+
+
+
+
+time_tensor_post = torch.tensor(scaled_time_array, dtype=torch.float32, requires_grad=True)
+prediction_tensor = network(time_tensor_post)
+full_prediction_array = np.array(prediction_tensor.detach())
+predict_voltage_array, predict_current_array = full_prediction_array[:, 0], full_prediction_array[:, 1]
+final_coeff_vector = sparse_coeff_vector_list_list[-1][0].clone().detach()
+final_sparsity_mask = sparsity_mask_list_list[-1][0].clone()
+
+
+bt_coeff_vector = sparse_coeff_vector_list_list[0][0].clone()
+bt_sparsity_mask = sparsity_mask_list_list[0][0].clone()
+
+response_recalc_bt = VE_datagen.calculate_int_diff_equation(time_tensor_post, prediction_tensor[:, 1], network, bt_coeff_vector, bt_sparsity_mask, library_diff_order, input_type)
+
+# Alt finite difference method
+bt_coeff_vector_array = np.array(bt_coeff_vector.detach())
+response_recalc_bt_fd = VE_datagen.calculate_finite_difference_diff_equation(scaled_time_array, predict_voltage_array, predict_current_array, bt_coeff_vector_array, bt_sparsity_mask, library_diff_order, input_type)
+
+plt.plot(time_array.flatten(), predict_current_array.flatten(), label='prediction')
+plt.plot(time_array.flatten(), response_recalc_bt.flatten(), label='recalc', marker='.', markersize=1, linestyle='None')
+plt.plot(time_array.flatten(), response_recalc_bt_fd.flatten(), label='recalc_fd', marker='.', markersize=1, linestyle='None')
+plt.legend()
+
+
+
+
+
+# Alt finite difference method
+final_coeff_vector_array = np.array(final_coeff_vector.detach())
+response_recalc_at_fd = VE_datagen.calculate_finite_difference_diff_equation(scaled_time_array, predict_voltage_array, predict_current_array, final_coeff_vector_array, final_sparsity_mask, library_diff_order, input_type)
+
+plt.plot(time_array.flatten(), response_recalc_at_fd.flatten(), label='recalc_fd', marker='.', markersize=1, linestyle='None')
+
+
+
+
+
+
+
+func_desc = 'sigmoid sinc'
+omega = 2*np.pi # As I programmed 5 osc, with an f_AWG of 1 Hz, this makes f_prog 5 Hz.
+# This leaves omega as 10pi (2pi * f_AWG * f_prog)
+# I choose to aim for omega pi, so if f_AWG set to 0.1 Hz, this is accomplished.
+Amp = 7
+input_expr_1 = lambda t: Amp*np.sin(omega*t)/(omega*t)
+input_torch_lambda_1 = lambda t: Amp*torch.sin(omega*t)/(omega*t)
+
+def sigmoid_expr(max_value=1, h_shift=0, width=1):
+    return lambda t: max_value / (1 + np.exp(-(t-h_shift)/width))
+def sigmoid_torch_expr(max_value=1, h_shift=0, width=1):
+    return lambda t: max_value / (1 + torch.exp(-(t-h_shift)/width))
+width_val = 0.1
+shift_val = 0.2*(-2*np.pi/omega)
+input_expr_2 = sigmoid_expr(h_shift=shift_val, width=width_val)
+input_torch_lambda_2 = sigmoid_torch_expr(h_shift=shift_val, width=width_val)
+
+# Multiplying 2 signals together
+input_expr = lambda t: input_expr_1(t) * input_expr_2(t)
+input_torch_lambda = lambda t: input_torch_lambda_1(t) * input_torch_lambda_2(t)
+
+number_of_samples = 1000
+noise_level = 0
