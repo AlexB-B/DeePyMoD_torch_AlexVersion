@@ -1,4 +1,5 @@
-# Use command %run -i "/home/working/data/make_all_plots.py" (local)
+# Use command %run -i "/home/working/data/make_all_plots.py" (local docker)
+# or %run -i "/Users/alexanderbrandon-bravo/Documents/GitHub/DeePyMoD_torch_AlexVersion/data/make_all_plots.py" (local)
 # or %run -i "/home/alex/DeePyMoD_torch_AlexVersion/data/make_all_plots.py" (remote)
 # Run from console with cwd as folder containing csv files of interest etc.
 
@@ -198,7 +199,8 @@ plt.savefig(save_path+'loss_evolution.png', bbox_inches='tight')
 
 
 # Plot coeffs graphs
-first_coeff_column_idx = 4 + number_graphs
+sign_loss_present = 1 if library_config['coeff_sign'] in ('positive', 'negative', 1, -1) else 0
+first_coeff_column_idx = 3 + sign_loss_present + number_graphs
 library_diff_order = library_config['diff_order']
 
 colors = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red']
