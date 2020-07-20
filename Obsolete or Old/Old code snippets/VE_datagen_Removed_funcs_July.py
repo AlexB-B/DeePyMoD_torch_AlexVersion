@@ -74,3 +74,38 @@ def equation_residuals_auto(theta, strain_t, coeffs, sparsity_mask='full', diff_
     residuals = num_theta @ coeffs_array
         
     return residuals
+
+
+def wave_packet_lambdas_integ(freq_max, std_dev, amp):
+    '''
+    Wave packets are created by making a Fourier series of sine waves.
+    This function integrates a continuos spectrum of sine waves for this purpose and packages this expression into a lambda function.
+    Also the derivative lambda and torch lambda versions are made for use in DeepMoD notebooks.
+    The standard lambda uses numerical integration. The derivative lambda uses numerical derivatives in addition.
+    This function almost certainly doesn't work.
+    '''
+    
+    # changing freq_max changes the 'detail' in the wave packet.
+    # changing the std_dev changes the size of the wavepacket.
+    # replacing the gaussian weighting of the discrete waves with a constant makes the wavepacket look like a sinc function.
+    
+    # This method using numerical integration arguably produces a closer approximation of the ideal wavepacket [than wave_packet_lambdas_sum] but:
+    # - Cannot be implemented to handle PyTorch tensors
+    # - is arguably less transparent
+    # - In terms of time to calculate, this generally takes longer than wave_packet_lambdas_sum as a result mostly of the integration (np.gradient is fast).
+    # - generates a warning flag at large evaluation ranges.
+    
+    mean = freq_max/2
+    
+    integrand_lambda = lambda omega, t: np.exp(-((omega-mean)**2)/(2*std_dev**2)) * np.sin(omega*t)
+    output_lambda_single = lambda t: integ.quad(integrand_lambda, 0, freq_max, args=(t))[0]
+    output_lambda = lambda t_array: amp*np.array([output_lambda_single(t) for t in t_array])
+    d_output_lambda = lambda t_array: np.array([num_derivs_single(t, output_lambda, 1)[1] for t in t_array])
+    
+    # The below code will likely not work, untested so far, as a torch tensor will likely need to be converted to ...
+    # ... a numpy array to put put into quad, and therefore lose its history. (will throw up error as no .detach())
+    torch_integrand_lambda = lambda omega, t: torch.exp(-((omega-mean)**2)/(2*std_dev**2)) * torch.sin(omega*t)
+    torch_output_lambda_single = lambda t: integ.quad(torch_integrand_lambda, 0, freq_max, args=(t))[0]
+    torch_output_lambda = lambda t_tensor: amp*torch.stack([torch_output_lambda_single(t) for t in t_tensor])
+    
+    return output_lambda, d_output_lambda, torch_output_lambda
