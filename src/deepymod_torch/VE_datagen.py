@@ -105,7 +105,7 @@ def relax_creep(E_mods, viscs, input_type):
 
 
 # Data generation from differential equation
-def calculate_int_diff_equation(time, response, input_lambda_or_network, coeff_vector, sparsity_mask, library_diff_order, input_type):
+def calculate_int_diff_equation(time, response, manipulation_definition, coeff_vector, sparsity_mask, library_diff_order, input_type):
     '''
     Alternative function for generating viscoelastic response to provided manipulation for given mechanical model.
     Compared to calculate_strain_stress, this function is more versatile but less accurate.
@@ -120,9 +120,11 @@ def calculate_int_diff_equation(time, response, input_lambda_or_network, coeff_v
             Otherwise numerical derivatives will be used. Tensors are preferred.
         response: Nx1 Tensor OR array (must match time)
             Already defined response series used PURELY for initial values.
-        input_lambda_or_network: function OR nn.Module from PyTorch with first output as manipulation fit
+        manipulation_definition: function OR SymPy expression OR nn.Module from PyTorch with first output as manipulation fit
             Method of calculating manipulation profile and manipulation derivatives.
-            Preferred is function, providing direct analytical description of manipulation, derivatives obtained numerically.
+            Preferred is SymPy expression, so that analytical expressions for the manipulation profile and ...
+            ... the corresponding derivatives are known or can be accurately deduced.
+            Next preferred is function, providing direct analytical description of manipulation, derivatives obtained numerically.
             In case of noisy manipulation, neural network mediated fit can be used instead, with automatic derivatives.
         coeff_vector: Mx1 array OR detached Tensor
             Coefficients partially defining model discovered.
@@ -168,6 +170,13 @@ def calculate_int_diff_equation(time, response, input_lambda_or_network, coeff_v
     max_input_diff_order = max(input_mask)
     max_response_diff_order = max(response_mask)
     
+    # In case SymPy expression provided, perform analytical differentiation to prepare expressions for evaluation.
+    if str(type(manipulation_definition)).index('sympy'):
+        t_sym = sym.symbols('t') # Manipulation profile MUST use 't' as the symbol for time.
+        deriv_exprs = [manipulation_definition]
+        for _ in range(max_input_diff_order):
+            deriv_exprs += [deriv_exprs[-1].diff(t_sym)]
+    
     # Defines ODE to solve. Function as required by odeint to determine derivative of each variable for a given time point.
     # The 'variables' here are not strain and stress.
     # Each derivative of the response up to and not including the highest is treated as an independant variable from the perspective of odeint.
@@ -179,12 +188,14 @@ def calculate_int_diff_equation(time, response, input_lambda_or_network, coeff_v
         # Returns list of derivative of each input element in U.
         
         # Manipulation derivatives
-        if type(input_lambda_or_network) is type(lambda:0):
+        if type(manipulation_definition) is type(lambda:0):
             # Calculate numerical derivatives of manipulation variable by spooling a dummy time series around t.
-            input_derivs = num_derivs_single(t, input_lambda_or_network, max_input_diff_order)
+            input_derivs = num_derivs_single(t, manipulation_definition, max_input_diff_order)
+        elif str(type(manipulation_definition)).index('sympy'):
+            input_derivs = np.array([deriv_expr.evalf(subs={t_sym: t}) for deriv_expr in deriv_exprs])
         else: # network
             t_tensor = torch.tensor([t], dtype=torch.float32, requires_grad=True)
-            input_derivs = [input_lambda_or_network(t_tensor)[0]] # The [0] here selects the manipulation.
+            input_derivs = [manipulation_definition(t_tensor)[0]] # The [0] here selects the manipulation.
             for _ in range(max_input_diff_order):
                 # Calculate automatic derivatives of manipulation variable
                 input_derivs += [auto.grad(input_derivs[-1], t_tensor, create_graph=True)[0]]
@@ -428,12 +439,42 @@ def num_derivs_single(t, input_lambda, diff_order, num_girth=1, num_depth=101):
 
 ######## EXTENDED FUNCTIONALITY ########
 
-def calculate_int_diff_equation_initial(time_array, input_lambda, E, eta, input_type, model):
+def calculate_int_diff_equation_initial(time_array, input_lambda, input_type, E, eta, model):
+    '''
+    A variant of the function calculate_int_diff_equation(...) following mostly the same logic but now ...
+    ... repurposed for generating response data in a linear viscoelastic system a priori, without any ...
+    ... previously generated data from superposition integrals or neural networks.
+    This method is less accurate than generating data with Boltzmann superposition integrals.
+    The accuracy is most obviously compromised by incorrect initial values for the ODE solution.
+    For this reason, the script is best used with an analytical description of the manipulation variable that ...
+    ... begins as a flat line, like a manipulation profile eased into by a multiplied sigmoid curve.
+    The advantage of this method of the Boltzmann integrals is that it is able to calculate responses to ...
+    ... manipulations of either input type regardless of model, GMM or GKM.
+    
+    Parameters
+        time_array: N or Nx1 array
+            Time series over which response should be calculated.
+            More time points BOTH equals greater accuracy and greater computation time.
+        input_lambda: function
+            Returns manipulation value given a time point using analytical expression.
+        input_type: string
+            Must be 'Strain' or 'Stress'. Unlike calculate_strain_stress, no mechanical model is assumed.
+        E: list
+            Elastic moduli, beginning with equillibrium spring, partially defining mechanical model.
+        eta: list
+            Viscosities partially defining mechanical model. Will always be one element shorter than E.
+        model: string
+            Must be either 'GMM' or 'GKM'. Completes the description of the mechanical model.
+            Provides guide to structure for interpretation of E and eta.
+        
+    Returns
+        calculated_response_array: array matching shape of time_array
+    '''
     
     shape = time_array.shape
     time_array = time_array.flatten()
-    input_array = input_lambda(time_array)
     
+    # Initial value for zeroth derivative of manipulation at beginning can be calculated with Hooke's law.
     if model == 'GMM':
         if input_type == 'Strain':
             instant_response = input_array[0]*sum(E)
@@ -445,6 +486,7 @@ def calculate_int_diff_equation_initial(time_array, input_lambda, E, eta, input_
         else: # else 'Stress'
             instant_response = input_array[0]/E[0]
     
+    # Solve as ODE, so convert mechanical parameters to ODE coefficients.
     coeff_array = np.array(VE_params.coeffs_from_model_params(E, eta, model))
     mask_array = np.arange(len(coeff_array))
     library_diff_order = len(coeff_array) // 2
@@ -481,24 +523,25 @@ def calculate_int_diff_equation_initial(time_array, input_lambda, E, eta, input_
         dU_dt = list(U[1:]) + [da_dt]
         
         return dU_dt
-        
-    IVs = [instant_response] + [0]*(library_diff_order-1)
-    # A scalable method for getting accurate IVs for higher than zeroth order derivative would reuire sympy implemented differentiation and would be (symbolic_input_expr*symbolic_relax_or_creep_expr).diff()[.diff().diff() etc] evaluated at 0.
-    calculated_response_array = integ.odeint(calc_dU_dt, IVs, time_array)[:, 0:1]
     
-    if input_type == 'Strain':
-        strain_array = input_array
-        stress_array = calculated_response_array
-    else: # else 'Stress'
-        strain_array = calculated_response_array
-        stress_array = input_array
+    # A scalable method for getting accurate IVs for higher than zeroth order derivative would require sympy implemented differentiation and would be (symbolic_input_expr*symbolic_relax_or_creep_expr).diff()[.diff().diff() etc] evaluated at 0.
+    # As it is, all derivatives are initialized at 0.
+    IVs = [instant_response] + [0]*(library_diff_order-1)
+    calculated_response_array = integ.odeint(calc_dU_dt, IVs, time_array)[:, 0:1]
         
-    strain_array, stress_array = strain_array.reshape(shape), stress_array.reshape(shape)
+    calculated_response_array = calculated_response_array.reshape(shape)
         
-    return strain_array, stress_array
+    return calculated_response_array
 
 
 def calculate_finite_difference_diff_equation(time_array, strain_array, stress_array, coeff_vector, sparsity_mask, library_diff_order, input_type):
+    '''
+    Alternative method, analagous to calculate_int_diff_equation(...), but using a more transparent if less accurate method of ...
+    ... finite difference approximations of derivatives.
+    Still sensitive to initial values, but requires multiple serial zeroth derivative values instead of higher derivatives.
+    Slower than calculate_int_diff_equation(...).
+    Heavily reliant on SymPy.
+    '''
     
     # MAKE SENSE OF MASKS
     strain_coeffs_mask, stress_coeffs_mask = align_masks_coeffs(coeff_vector, sparsity_mask, library_diff_order)
@@ -582,6 +625,11 @@ def calculate_finite_difference_diff_equation(time_array, strain_array, stress_a
 
 
 def generate_finite_difference_approx_deriv(sym_string, diff_order):
+    '''
+    Function to convert differential operation to a finite difference approximation.
+    Uses first principles definition of derivatives.
+    Used exclusively by calculate_finite_difference_diff_equation(...) and is also heavily reliant on SymPy.
+    '''
     
     # Each symbol refers to the dependant variable at previous steps through independant variable values.
     # Starts from the current variable value and goes backwards.
@@ -608,6 +656,13 @@ def generate_finite_difference_approx_deriv(sym_string, diff_order):
 
 # Wave packet lambda generation
 def wave_packet_lambdas_sum(freq_max, freq_step, std_dev, amp):
+    '''
+    Wave packets are created by making a Fourier series of sine waves.
+    This function sums discrete sine waves for this purpose and packages this expression into a lambda function.
+    Also the derivative lambda and torch lambda versions are made for use in DeepMoD notebooks.
+    As the frequency spectrum is not continuos, the expression is eventually periodic but ...
+    ... periods of very small amplitude can exist between beats.
+    '''
     
     # changing freq_max changes the 'detail' in the wave packet.
     # Changing the freq_step changes the seperation of the wave packets.
@@ -622,33 +677,5 @@ def wave_packet_lambdas_sum(freq_max, freq_step, std_dev, amp):
     d_output_lambda = lambda t: amp*freq_step*sum([omega*np.exp(-((omega-mean)**2)/(2*std_dev**2))*np.cos(omega*t) for omega in omega_array])
     
     torch_output_lambda = lambda t: amp*freq_step*sum([np.exp(-((omega-mean)**2)/(2*std_dev**2))*torch.sin(omega*t) for omega in omega_array])
-    
-    return output_lambda, d_output_lambda, torch_output_lambda
-
-
-def wave_packet_lambdas_integ(freq_max, std_dev, amp):
-    
-    # changing freq_max changes the 'detail' in the wave packet.
-    # changing the std_dev changes the size of the wavepacket.
-    # replacing the gaussian weighting of the discrete waves with a constant makes the wavepacket look like a sinc function.
-    
-    # This method using numerical integration arguably produces a closer approximation of the ideal wavepacket [than wave_packet_lambdas_sum] but:
-    # - Cannot be implemented to handle PyTorch tensors
-    # - is arguably less transparent
-    # - In terms of time to calculate, this generally takes longer than wave_packet_lambdas_sum as a result mostly of the integration (np.gradient is fast).
-    # - generates a warning flag at large evaluation ranges.
-    
-    mean = freq_max/2
-    
-    integrand_lambda = lambda omega, t: np.exp(-((omega-mean)**2)/(2*std_dev**2)) * np.sin(omega*t)
-    output_lambda_single = lambda t: integ.quad(integrand_lambda, 0, freq_max, args=(t))[0]
-    output_lambda = lambda t_array: amp*np.array([output_lambda_single(t) for t in t_array])
-    d_output_lambda = lambda t_array: np.array([num_derivs_single(t, output_lambda, 1)[1] for t in t_array])
-    
-    # The below code will likely not work, untested so far, as a torch tensor will likely need to be converted to ...
-    # ... a numpy array to put put into quad, and therefore lose its history. (will throw up error as no .detach())
-    torch_integrand_lambda = lambda omega, t: torch.exp(-((omega-mean)**2)/(2*std_dev**2)) * torch.sin(omega*t)
-    torch_output_lambda_single = lambda t: integ.quad(torch_integrand_lambda, 0, freq_max, args=(t))[0]
-    torch_output_lambda = lambda t_tensor: amp*torch.stack([torch_output_lambda_single(t) for t in t_tensor])
     
     return output_lambda, d_output_lambda, torch_output_lambda
