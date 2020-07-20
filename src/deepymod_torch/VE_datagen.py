@@ -171,7 +171,7 @@ def calculate_int_diff_equation(time, response, manipulation_definition, coeff_v
     max_response_diff_order = max(response_mask)
     
     # In case SymPy expression provided, perform analytical differentiation to prepare expressions for evaluation.
-    if str(type(manipulation_definition)).index('sympy'):
+    if str(type(manipulation_definition)).find('sympy') >= 0:
         t_sym = sym.symbols('t') # Manipulation profile MUST use 't' as the symbol for time.
         deriv_exprs = [manipulation_definition]
         for _ in range(max_input_diff_order):
@@ -191,7 +191,7 @@ def calculate_int_diff_equation(time, response, manipulation_definition, coeff_v
         if type(manipulation_definition) is type(lambda:0):
             # Calculate numerical derivatives of manipulation variable by spooling a dummy time series around t.
             input_derivs = num_derivs_single(t, manipulation_definition, max_input_diff_order)
-        elif str(type(manipulation_definition)).index('sympy'):
+        elif str(type(manipulation_definition)).find('sympy') >= 0:
             input_derivs = np.array([deriv_expr.evalf(subs={t_sym: t}) for deriv_expr in deriv_exprs])
         else: # network
             t_tensor = torch.tensor([t], dtype=torch.float32, requires_grad=True)
