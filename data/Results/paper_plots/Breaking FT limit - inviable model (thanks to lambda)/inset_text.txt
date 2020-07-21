@@ -1,0 +1,1 @@
+---True Model--- \n$0.98\epsilon + \epsilon_t + 0.015\epsilon_{tt} =$ \n$0.98\sigma + 0.50\sigma_t + 0.0049\sigma_{tt}$ \n\n---Discovered Model--- \n$0.055\epsilon + \epsilon_t + 1.0\epsilon_{tt} + 0.078\epsilon_{ttt} =$ \n$0.92\sigma_t + 0.48\sigma_{tt}$
