@@ -172,7 +172,7 @@ def calculate_int_diff_equation(time, response, manipulation_definition, coeff_v
     
     # In case SymPy expression provided, perform analytical differentiation to prepare expressions for evaluation.
     if str(type(manipulation_definition)).find('sympy') >= 0:
-        t_sym = sym.symbols('t') # Manipulation profile MUST use 't' as the symbol for time.
+        t_sym = sym.symbols('t', real=True) # Manipulation profile MUST use 't' as the symbol for time.
         deriv_exprs = [manipulation_definition]
         for _ in range(max_input_diff_order):
             deriv_exprs += [deriv_exprs[-1].diff(t_sym)]
