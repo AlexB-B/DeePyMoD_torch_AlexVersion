@@ -339,18 +339,18 @@ full_time_tensor = torch.tensor(scaled_time_array, dtype=torch.float32, requires
 full_pred_tensor = model.network(full_time_tensor)
     
 if number_graphs == 1:
-    t_sym = sym.symbols('t')
-    input_expr = Amp*sym.sin(omega*t_sym/time_sf)/(omega*t_sym/time_sf)
-    if input_type == 'Strain':
-        scaled_input_expr = strain_sf*input_expr
-    else:
-        scaled_input_expr = stress_sf*input_expr
-    
-#     input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
+#     t_sym = sym.symbols('t')
+#     input_expr = Amp*sym.sin(omega*t_sym/time_sf)/(omega*t_sym/time_sf)
 #     if input_type == 'Strain':
-#         scaled_input_expr = lambda t: strain_sf*input_expr(t/time_sf)
+#         scaled_input_expr = strain_sf*input_expr
 #     else:
-#         scaled_input_expr = lambda t: stress_sf*input_expr(t/time_sf)
+#         scaled_input_expr = stress_sf*input_expr
+    
+    input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
+    if input_type == 'Strain':
+        scaled_input_expr = lambda t: strain_sf*input_expr(t/time_sf)
+    else:
+        scaled_input_expr = lambda t: stress_sf*input_expr(t/time_sf)
     
     response_recalc = VE_datagen.calculate_int_diff_equation(full_time_tensor, full_pred_tensor, scaled_input_expr, final_coeffs, final_mask, library_diff_order, input_type)
     
@@ -393,7 +393,7 @@ except:
     inset_text = input('If text is desired for the reformulation plot, state here. Otherwise leave blank.')
     inset_text = codecs.decode(inset_text, 'unicode_escape') # Stupid line because by default, processing occurs such that any escape characters submitted by the user are themselves escaped. This line reverses that process.
 if inset_text:
-    ax.text(0.44, 0.35, inset_text, transform=ax.transAxes, fontsize=12, bbox={'facecolor': 'white', 'edgecolor': 'black'})
+    ax.text(0.55, 0.35, inset_text, transform=ax.transAxes, fontsize=12, bbox={'facecolor': 'white', 'edgecolor': 'black'})
 
 ax.legend(numpoints=3, markerscale=5)
 
