@@ -8,9 +8,11 @@ import sys
 import re
 import pickle
 import numpy as np
+import sympy as sym
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
 import codecs
+import torch
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
 cwd = os.getcwd()
@@ -83,7 +85,12 @@ with open(dg_info_str, 'r') as file:
     omega = float(re.search(r'(omega: )(.+)', file_string).group(2))
     Amp = int(re.search(r'(Amp: )(.+)', file_string).group(2))
     input_type = re.search(r'(Input: )(.+)', file_string).group(2)
-
+    
+try:
+    with open('inset_text.txt', 'r') as file:
+        inset_text = file.read()
+except:0
+    
 dg_data = np.loadtxt(dg_series_str, delimiter=',')
 fit_data = np.loadtxt('NN_series_data.csv', delimiter=',')
 full_pred = np.loadtxt('full_prediction.csv', delimiter=',')
@@ -326,22 +333,26 @@ if input_type == 'Strain':
     target_array = stress_array
 else:
     target_array = strain_array
-
-# full_pred could be determined directly from model.network.
-# This would mean that time, pred and final_coeffs could all be tensors...
-# ...and allow for slightly more accurate Initial Values as determined...
-# ...by auto derivs, allowing for a slightly better recalc.
-# Early points skipped due to edge effects would be unchanged however and seeing...
-# ...as these are the only visible problem, I am not bothering to change anything.
     
-if number_graphs == 1:    
-    input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
+# Automatic IVs
+full_time_tensor = torch.tensor(scaled_time_array, dtype=torch.float32, requires_grad=True).reshape(-1, 1)
+full_pred_tensor = model.network(full_time_tensor)
+    
+if number_graphs == 1:
+    t_sym = sym.symbols('t')
+    input_expr = Amp*sym.sin(omega*t_sym/time_sf)/(omega*t_sym/time_sf)
     if input_type == 'Strain':
-        scaled_input_expr = lambda t: strain_sf*input_expr(t/time_sf)
+        scaled_input_expr = strain_sf*input_expr
     else:
-        scaled_input_expr = lambda t: stress_sf*input_expr(t/time_sf)
-        
-    response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred.flatten(), scaled_input_expr, final_coeffs, final_mask, library_diff_order, input_type)
+        scaled_input_expr = stress_sf*input_expr
+    
+#     input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
+#     if input_type == 'Strain':
+#         scaled_input_expr = lambda t: strain_sf*input_expr(t/time_sf)
+#     else:
+#         scaled_input_expr = lambda t: stress_sf*input_expr(t/time_sf)
+    
+    response_recalc = VE_datagen.calculate_int_diff_equation(full_time_tensor, full_pred_tensor, scaled_input_expr, final_coeffs, final_mask, library_diff_order, input_type)
     
     if input_type == 'Strain':
         unscaled_response_recalc = response_recalc/stress_sf
@@ -354,7 +365,7 @@ if number_graphs == 1:
         
     title_bit = 'scaled'
 else:    
-    response_recalc = VE_datagen.calculate_int_diff_equation(scaled_time_array, full_pred[:, 1], model.network, final_coeffs, final_mask, library_diff_order, input_type)
+    response_recalc = VE_datagen.calculate_int_diff_equation(full_time_tensor, full_pred_tensor[:, 1], model.network, final_coeffs, final_mask, library_diff_order, input_type)
     
     if input_type == 'Strain':
         unscaled_response_recalc = response_recalc/stress_sf
@@ -377,8 +388,7 @@ else:
     ax.plot(time_array, target_array, label='Original Data', color='blue', linestyle='None', marker='.', markersize=1)
 ax.plot(time_array, unscaled_response_recalc.flatten(), label='Reformulation', color='darkorange', linestyle='--', linewidth=2)
 
-try:
-    inset_text
+try:inset_text
 except:
     inset_text = input('If text is desired for the reformulation plot, state here. Otherwise leave blank.')
     inset_text = codecs.decode(inset_text, 'unicode_escape') # Stupid line because by default, processing occurs such that any escape characters submitted by the user are themselves escaped. This line reverses that process.
@@ -389,7 +399,3 @@ ax.legend(numpoints=3, markerscale=5)
 
 plt.tight_layout()
 plt.savefig(save_path+'recalculation_from_coeffs.png', bbox_inches='tight')
-
-'''
----True Model--- \n$0.98\epsilon + \epsilon_t + 0.015\epsilon_{tt} =$ \n$0.98\sigma + 0.50\sigma_t + 0.0049\sigma_{tt}$ \n\n---Discovered Model--- \n$0.055\epsilon + \epsilon_t + 1.0\epsilon_{tt} + 0.078\epsilon_{ttt} =$ \n$0.92\sigma_t + 0.48\sigma_{tt}$
-'''
