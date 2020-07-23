@@ -51,7 +51,7 @@ try:
     library_config = model.configs.library
 except:
     try:
-        with open('model.deepmod', 'rb') as file:
+        with open('model.deepmod', 'rb') as file: # old naming convention
             model = pickle.load(file)
         library_config = model.configs.library
     except:
@@ -275,14 +275,14 @@ plt.savefig(save_path+'coeff_evolution.png', bbox_inches='tight')
 # DV plots
 expected_coeffs = list(expected_coeffs.flatten())
 
-time_array = dg_data[:, 0]
+time_array = dg_data[:, 0:1]
 # time_array = time_array - min(time_array) + 10**-10
-strain_array = dg_data[:, 1]
-stress_array = dg_data[:, 2]
+strain_array = dg_data[:, 1:2]
+stress_array = dg_data[:, 2:]
 
 scaled_time_array = time_array*time_sf
 scaled_strain_array = strain_array*strain_sf
-scaled_stress_array = strain_array*stress_sf
+scaled_stress_array = stress_array*stress_sf
 
 if number_graphs == 1: # Tell tale sign that not using real data, so target comp allowed.
     errors_exp_tar = VE_datagen.equation_residuals(scaled_time_array, scaled_strain_array, scaled_stress_array, expected_coeffs)
@@ -334,17 +334,17 @@ if input_type == 'Strain':
 else:
     target_array = strain_array
     
-# Automatic IVs
-full_time_tensor = torch.tensor(scaled_time_array, dtype=torch.float32, requires_grad=True).reshape(-1, 1)
-full_pred_tensor = model.network(full_time_tensor)
+try: # Automatic IVs
+    full_time_tensor = torch.tensor(scaled_time_array, dtype=torch.float32, requires_grad=True).reshape(-1, 1)
+    full_pred_tensor = model.network(full_time_tensor)
+except NameError: # Numerical IVs
+    full_time_tensor = scaled_time_array
+    full_pred_tensor = full_pred
     
 if number_graphs == 1:
 #     t_sym = sym.symbols('t')
-#     input_expr = Amp*sym.sin(omega*t_sym/time_sf)/(omega*t_sym/time_sf)
-#     if input_type == 'Strain':
-#         scaled_input_expr = strain_sf*input_expr
-#     else:
-#         scaled_input_expr = stress_sf*input_expr
+#     scaled_input_expr = Amp*sym.sin(omega*t_sym/time_sf)/(omega*t_sym/time_sf)
+#     scaled_input_expr *= strain_sf if input_type == 'Strain' else stress_sf
     
     input_expr = lambda t: Amp*np.sin(omega*t)/(omega*t)
     if input_type == 'Strain':
@@ -393,7 +393,7 @@ except:
     inset_text = input('If text is desired for the reformulation plot, state here. Otherwise leave blank.')
     inset_text = codecs.decode(inset_text, 'unicode_escape') # Stupid line because by default, processing occurs such that any escape characters submitted by the user are themselves escaped. This line reverses that process.
 if inset_text:
-    ax.text(0.55, 0.35, inset_text, transform=ax.transAxes, fontsize=12, bbox={'facecolor': 'white', 'edgecolor': 'black'})
+    ax.text(0.52, 0.38, inset_text, transform=ax.transAxes, fontsize=12, bbox={'facecolor': 'white', 'edgecolor': 'black'})
 
 ax.legend(numpoints=3, markerscale=5)
 
