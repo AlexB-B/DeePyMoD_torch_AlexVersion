@@ -30,12 +30,10 @@ def run_deepmod(data, target, library_config, network_config={}, optim_config={}
         model.fit.initial_guess = lstsq_guess_list
         model.fit.coeff_vector = nn.ParameterList([nn.Parameter(torch.tensor(lstsq_guess, dtype=torch.float32)) for lstsq_guess in lstsq_guess_list])
     
-    optimizer = torch.optim.Adam(({'params': model.network.parameters(), 'lr': configs.optim['lr_nn']}, {'params': model.fit.coeff_vector.parameters(), 'lr': configs.optim['lr_coeffs']}), betas=configs.optim['betas'], amsgrad=configs.optim['amsgrad'])
+    model.optimizer = torch.optim.Adam(({'params': model.network.parameters(), 'lr': configs.optim['lr_nn']}, {'params': model.fit.coeff_vector.parameters(), 'lr': configs.optim['lr_coeffs']}), betas=configs.optim['betas'], amsgrad=configs.optim['amsgrad'])
     
-    training.train_deepmod(model, data, target, optimizer)
-    
-    model.optimizer = optimizer
-    
+    training.train_deepmod(model, data, target, model.optimizer)
+        
     return model
 
     
