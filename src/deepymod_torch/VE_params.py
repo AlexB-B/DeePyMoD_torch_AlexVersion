@@ -70,7 +70,7 @@ def model_params_from_coeffs(coeff_vector, model, print_expressions=False):
             
     # When solving, additional symbol to evaluate is added just in time.
     # Returned is a list of tuples, each tuple being a different solution. If no solution, returns empty list.
-    model_params_value_list = sym.solve(coeff_equations_list, model_params_mask_list + [natural_strain_t_coeff_sym])
+    model_params_value_list = sym.solve(coeff_equations_list, model_params_mask_list + [natural_strain_t_coeff_sym], rational=False)
     
     # No need to report value of natural_strain_t_coeff_sym
     model_params_value_list = [model_params_values[:-1] for model_params_values in model_params_value_list]
