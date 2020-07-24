@@ -3,7 +3,7 @@ import sympy as sym
 import IPython.display as dis
 
 
-def model_params_from_coeffs(coeff_vector, model, print_expressions=False): 
+def model_params_from_coeffs(coeff_vector, model, rational=True, minimal=False, print_expressions=False): 
     '''
     Handles symbolic conversion from coefficients within GDM to meaningful mechanical constants of mechanical model of choice.
     Reverse process of coeffs_from_model_params but much more challenging.
@@ -17,6 +17,13 @@ def model_params_from_coeffs(coeff_vector, model, print_expressions=False):
             Must conform to GDM structure. Should not include coefficient of the first derivative of strain.
         model: string
              Must be either 'GMM' or 'GKM'. Specifies framework of interpretation. Usually, either is possible.
+        rational: boolean; OPTIONAL
+            Passed directly to sym.solve, this kwarg means that floats are recast as ratios.
+            Set to False if solution is otherwise extremely slow to reach.
+        minimal: boolean; OPTIONAL
+            Passed directly to sym.solve, this kwarg means that "A very fast, minimal testing" is used when ...
+            ... solving the simultaneous equations. Set to True if solution is otherwise extremely slow to reach.
+            Setting rational=False is preferable, but both may be required.
         print_expressions: bool; OPTIONAL
             SymPy expressions can be displayed to display the simultaneous equations to solve.
             
@@ -59,6 +66,15 @@ def model_params_from_coeffs(coeff_vector, model, print_expressions=False):
     # ... and solve as a series of equations with one additional symbol, and one additional equation.
     coeff_vector = coeff_vector[0:1] + [1] + coeff_vector[1:]
     natural_strain_t_coeff_sym = sym.symbols('c^n_{\epsilon_t}', real=True, positive=True) # Additional symbol. Represents the 'natural' coefficient of the first derivative of strain.
+    
+    if False: # Toggle to True to replace references to viscosities in favour of decay times. I don't think this helps, at least not how I've done it.
+        letter = 'M' if model == 'GMM' else 'K'
+        tau_syms = [sym.symbols(f'tau^{letter}_{branch_index}', real=True, positive=True) for branch_index in range(1, order+1)]
+        for unit_index in range(order):
+            for idx, coeff_expr in enumerate(coeff_expression_list):
+                coeff_expression_list[idx] = coeff_expr.subs(model_params_mask_list[unit_index+order+1], tau_syms[unit_index]*model_params_mask_list[unit_index+1])
+        model_params_mask_list[order+1:] = tau_syms
+    
     coeff_expression_list = [sym.simplify(coeff_expression) for coeff_expression in coeff_expression_list]
         
     # Form list of simultaneous expressions to solve.
@@ -70,7 +86,7 @@ def model_params_from_coeffs(coeff_vector, model, print_expressions=False):
             
     # When solving, additional symbol to evaluate is added just in time.
     # Returned is a list of tuples, each tuple being a different solution. If no solution, returns empty list.
-    model_params_value_list = sym.solve(coeff_equations_list, model_params_mask_list + [natural_strain_t_coeff_sym], rational=False)
+    model_params_value_list = sym.solve(coeff_equations_list, model_params_mask_list + [natural_strain_t_coeff_sym], rational=rational, minimal=minimal)
     
     # No need to report value of natural_strain_t_coeff_sym
     model_params_value_list = [model_params_values[:-1] for model_params_values in model_params_value_list]
