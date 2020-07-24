@@ -1,1 +1,1 @@
-On overleaf this example is included as Invalid_mech_model
+On overleaf this example is included as supplementary/FT_Break
