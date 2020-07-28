@@ -143,8 +143,10 @@ def coeffs_from_model_params(E_mod_list, visc_list, model, print_expressions=Fal
     if print_expressions:
         dis.display(*coeff_expression_list)
     
+    subs_dict = dict(zip(model_params_mask_list, E_mod_list+visc_list))
+    
     # Substitute in all mechanical values into expressions.
-    coeff_value_list = [coeff_expression.subs(zip(model_params_mask_list, E_mod_list+visc_list)) for coeff_expression in coeff_expression_list]
+    coeff_value_list = [coeff_expression.evalf(subs=subs_dict) for coeff_expression in coeff_expression_list]
     
     return coeff_value_list
 
