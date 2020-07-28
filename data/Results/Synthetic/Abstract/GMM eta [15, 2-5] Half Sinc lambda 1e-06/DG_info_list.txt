@@ -1,7 +1,0 @@
-Model: GMM
-E: [1, 1, 1]
-eta: [15, 2.5]
-Input: Strain
-Desc: Half Sinc
-omega: 1
-Amp: 7

@@ -1,1 +1,0 @@
-Useless because only time I want an example where a viable model is found of wrong order is for single branch collapse example for which I want to make eta a pure branch collapse [1, 1] for example.

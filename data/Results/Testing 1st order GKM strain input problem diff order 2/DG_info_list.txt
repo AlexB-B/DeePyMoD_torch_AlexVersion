@@ -1,6 +1,0 @@
-E: [0.00025, 0.00025]
-eta: [0.00025]
-Input: Strain
-Desc: Half sinc
-omega: 3.141592653589793
-Amp: 7

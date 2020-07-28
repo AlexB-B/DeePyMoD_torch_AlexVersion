@@ -1,7 +1,0 @@
----True Model---
-$0.032\epsilon + \epsilon_t + 0.73\epsilon_{tt} =$
-$0.032\sigma + 0.50\sigma_t + 0.24\sigma_{tt}$
-
----Discovered Model---
-$\epsilon_t + 0.69\epsilon_{tt} =$
-$0.026\sigma + 0.51\sigma_t + 0.23\sigma_{tt}$

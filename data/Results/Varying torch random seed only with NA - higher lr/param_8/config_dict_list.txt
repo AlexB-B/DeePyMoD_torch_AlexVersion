@@ -1,3 +1,0 @@
-optim: {'lr_coeffs': 0.005, 'max_iterations': 100001, 'final_run_iterations': 15001, 'thresh_func': <function <lambda> at 0x7f2ac9282488>}
-network: {'input_dim': 1, 'hidden_dim': 30, 'layers': 4, 'output_dim': 1}
-library: {'type': <function mech_library at 0x7f2ac92de510>, 'diff_order': 3, 'coeff_sign': 'positive', 'input_type': 'Strain', 'input_expr': <function <lambda> at 0x7f2ac92def28>}

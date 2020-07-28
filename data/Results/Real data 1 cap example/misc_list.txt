@@ -1,2 +1,0 @@
-date_stamp: 10/04/2020 10:31:54
-success: Success

@@ -1,4 +1,0 @@
-noise_factor: 0
-time_sf: 1
-strain_sf: 0.12176934611348307
-stress_sf: 0.14285714285714288

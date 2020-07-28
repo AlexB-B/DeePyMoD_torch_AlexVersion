@@ -1,4 +1,0 @@
-library: {'library_func': <function mech_library at 0x7ff747eb0e18>, 'diff_order': 3, 'coeff_sign': 1, 'input_type': 'Strain'}
-network: {'hidden_dim': 30, 'pre_trained_network': None, 'layers': 4}
-optim: {'lr_coeffs': 0.002, 'thresh_func': <function thresh_pc at 0x7ff74a4bab70>, 'l1': 1e-05, 'final_run_iterations': 10001, 'PINN': False, 'kappa': 1, 'lr_nn': 0.001, 'betas': (0.9, 0.999), 'amsgrad': False, 'mse_only_iterations': None, 'max_iterations': 100001, 'use_lstsq_approx': False}
-report: {'plot': True, 'print_interval': 1000}

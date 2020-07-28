@@ -1,4 +1,0 @@
-Decay Constant
-50.26548245743669
-1
-Fail

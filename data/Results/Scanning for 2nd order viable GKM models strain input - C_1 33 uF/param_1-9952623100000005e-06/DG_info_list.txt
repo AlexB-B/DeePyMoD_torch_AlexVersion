@@ -1,7 +1,0 @@
-Model: GKM
-E: [0.0005, 0.0005, 0.0005]
-eta: [3.3e-05, 1.9952623100000005e-06]
-Input: Strain
-Desc: sigmoid sinc
-omega: 6.283185307179586
-Amp: 7

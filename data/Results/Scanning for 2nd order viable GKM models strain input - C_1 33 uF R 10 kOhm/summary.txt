@@ -1,1 +1,0 @@
-Most got pretty close, but none succeeded entirely which is odd. Only exception is the couple around 33e-6 where we see the two kelvin units probably collapsing into one.

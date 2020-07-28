@@ -1,3 +1,0 @@
-optim: {'lr_coeffs': 0.005, 'PINN': True, 'mse_only_iterations': 30001, 'betas': (0.99, 0.99), 'l1': 1e-05, 'kappa': 1, 'lr_nn': 0.001, 'amsgrad': False, 'max_iterations': 100001, 'final_run_iterations': 10001, 'use_lstsq_approx': False, 'thresh_func': <function Configuration.add_defaults.<locals>.<lambda> at 0x7f14a52ce0d0>}
-network: {'hidden_dim': 30, 'pre_trained_network': None, 'layers': 4}
-library: {'library_func': <function mech_library_real at 0x7f14a78c5268>, 'diff_order': 1, 'coeff_sign': 1}

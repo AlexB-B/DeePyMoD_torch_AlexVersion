@@ -1,7 +1,0 @@
-Model: GKM
-E: [0.0005025125628140704, 0.0005025125628140704]
-eta: [0.001]
-Input: Strain
-Desc: half sinc
-omega: 3.141592653589793
-Amp: 7

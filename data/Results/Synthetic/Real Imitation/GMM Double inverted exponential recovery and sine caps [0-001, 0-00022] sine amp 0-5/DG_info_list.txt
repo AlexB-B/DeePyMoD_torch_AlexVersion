@@ -1,7 +1,0 @@
-Model: GMM
-E: [0.0005, 0.0005, 0.0005]
-eta: [0.001, 0.00022]
-Input: Strain
-Desc: Double inverted exponential recovery and sine
-omega: 0.9, 7.2, 7.5398223686155035
-Amp: 4, 4, 0.5

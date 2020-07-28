@@ -1,4 +1,0 @@
-date_stamp: 04/05/2020 11:34:19
-NumPy seed: 2
-Torch seed: 0
-success: Success
