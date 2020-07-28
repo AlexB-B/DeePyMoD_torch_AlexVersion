@@ -34,9 +34,9 @@ try: # Check if variables already defined in ipython console (requires "-i" flag
 except NameError:
     main_train_path = input('Name of folder containing main training tensorboard')
     post_thresh_train_path = input('Name of folder containing post threshold training tensorboard')
-if not os.path.isdir('Figures'):
-    os.makedirs('Figures')
-save_path = 'Figures/'
+if not os.path.isdir('figures'):
+    os.makedirs('figures')
+save_path = 'figures/'
 if os.path.exists('DG_series_data.csv'):
     dg_series_str = 'DG_series_data.csv'
     dg_info_str = 'DG_info_list.txt'
