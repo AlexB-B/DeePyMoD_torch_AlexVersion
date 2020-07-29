@@ -1,0 +1,7 @@
+Model Structure = GKM
+R = [2, 2] kOhms
+C = [1] mF
+R_shunt = 10.2 Ohms
+
+Manipulation Variable = Voltage
+Manipulation Description = 7*sinc(pi*t) V
