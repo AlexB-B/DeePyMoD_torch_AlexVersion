@@ -143,7 +143,7 @@ for tar, ax in enumerate(axes):
     ax.set_xlabel('Scaled time')
     ax.plot(time, fit_data[:, 1+tar], linestyle='None', marker='.', markersize=1, color='blue', label='Target')
     ax.plot(time, fit_data[:, 1+number_graphs+tar], linestyle='None', marker='.', markersize=1, color='red', label='Prediction')
-    ax.legend(numpoints=3, markerscale=5)
+    ax.legend(numpoints=3, markerscale=5, fontsize='xx-large')
     
 plt.tight_layout()
 plt.savefig(save_path+'target_prediction_fit.png', bbox_inches='tight')
@@ -181,7 +181,7 @@ ax1.semilogy(steps_main, smoothed_data_main[:, 2+mod], color='orange', label='PI
 ax1.semilogy(steps_main, smoothed_data_main[:, 3+mod], color='green', label='L1')
 # ax1.semilogy(steps_main, smoothed_data_main[:, 4+mod], color='purple', label='Sign')
 ax1.semilogy(steps_main, smoothed_data_main[:, 0], color='red', label='Total')
-ax1.legend(numpoints=3, markerscale=5)
+ax1.legend(numpoints=3, markerscale=5, fontsize='medium')
 ax1.set_xlim(right=1.005*steps_main[-1])
 # linestyle='None', marker='.', markersize=1, 
 
@@ -236,7 +236,7 @@ for idx_diff_order in start_stress_coeffs_mask:
     ax1.plot(steps_main, data_main[:, series_idx], color=colors[idx_diff_order], label=stress_labels[idx_diff_order])
     series_idx += 1
 
-ax1.legend(ncol=2)
+ax1.legend(ncol=2, fontsize='medium')
 ax1.set_xlim(right=1.005*steps_main[-1])
 
 final_coeffs = final_coeffs_data[:, 0]
@@ -293,7 +293,7 @@ if number_graphs == 1: # Tell tale sign that not using real data, so target comp
     ax.set_xlabel('Scaled time')
     ax.semilogy(scaled_time_array, abs(errors_exp_tar), linestyle='None', marker='.', markersize=1, color='green', label='Expected coefficients')
     ax.semilogy(scaled_time_array, abs(errors_DM_tar), linestyle='None', marker='.', markersize=1, color='red', label='Discovered coefficients')
-    ax.legend(numpoints=3, markerscale=5)
+    ax.legend(numpoints=3, markerscale=5, fontsize='xx-large')
     
     plt.tight_layout()
     plt.savefig(save_path+'target_residuals.png', bbox_inches='tight')
@@ -318,7 +318,7 @@ ax.set_ylabel('Magnitude of GDM residual using prediction')
 ax.set_xlabel('Scaled time')
 ax.semilogy(scaled_time_array, abs(errors_exp_pred), linestyle='None', marker='.', markersize=1, color='green', label='Expected coefficients')
 ax.semilogy(scaled_time_array, abs(errors_DM_pred), linestyle='None', marker='.', markersize=1, color='red', label='Discovered coefficients')
-ax.legend(numpoints=3, markerscale=5)
+ax.legend(numpoints=3, markerscale=5, fontsize='xx-large')
     
 plt.tight_layout()
 plt.savefig(save_path+'prediction_residuals.png', bbox_inches='tight')
@@ -395,7 +395,7 @@ except:
 if inset_text:
     ax.text(0.52, 0.38, inset_text, transform=ax.transAxes, fontsize=12, bbox={'facecolor': 'white', 'edgecolor': 'black'})
 
-ax.legend(numpoints=3, markerscale=5)
+ax.legend(numpoints=3, markerscale=5, fontsize='xx-large')
 
 plt.tight_layout()
 plt.savefig(save_path+'recalculation_from_coeffs.png', bbox_inches='tight')
